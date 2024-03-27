@@ -14,3 +14,4 @@ obj/
 # Visual Studio code coverage results
 *.coverage
 *.coveragexml
+.idea/
