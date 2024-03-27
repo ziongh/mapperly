@@ -81,8 +81,8 @@ public static class NewValueTupleMappingBodyBuilder
             }
 
             // nullability is handled inside the member expressionMapping
-            var paramType = targetMember.Type.WithNullableAnnotation(targetMember.NullableAnnotation);
-            var mappingKey = new TypeMappingKey(sourcePath.MemberType, paramType, memberConfig?.ToTypeMappingConfiguration());
+            var targetMemberType = ctx.BuilderContext.SymbolAccessor.UpgradeNullable(targetMember.Type);
+            var mappingKey = new TypeMappingKey(sourcePath.MemberType, targetMemberType, memberConfig?.ToTypeMappingConfiguration());
             var delegateMapping = ctx.BuilderContext.FindOrBuildLooseNullableMapping(
                 mappingKey,
                 diagnosticLocation: memberConfig?.Location
@@ -113,16 +113,7 @@ public static class NewValueTupleMappingBodyBuilder
                 return false;
             }
 
-            var getterSourcePath = GetterMemberPath.Build(ctx.BuilderContext, sourcePath);
-
-            var memberMapping = new NullMemberMapping(
-                delegateMapping,
-                getterSourcePath,
-                paramType,
-                ctx.BuilderContext.GetNullFallbackValue(paramType),
-                !ctx.BuilderContext.IsExpression
-            );
-
+            var memberMapping = ctx.BuildNullMemberMapping(sourcePath, delegateMapping, targetMemberType);
             var ctorMapping = new ValueTupleConstructorParameterMapping(targetMember, memberMapping);
             constructorParameterMappings.Add(ctorMapping);
             mappedTargetMemberNames.Add(targetMember.Name);
@@ -135,7 +126,7 @@ public static class NewValueTupleMappingBodyBuilder
         INewValueTupleBuilderContext<INewValueTupleMapping> ctx,
         IFieldSymbol field,
         [NotNullWhen(true)] out MemberPath? sourcePath,
-        out PropertyMappingConfiguration? memberConfig
+        out MemberMappingConfiguration? memberConfig
     )
     {
         sourcePath = null;
@@ -179,18 +170,16 @@ public static class NewValueTupleMappingBodyBuilder
         out MemberPath? sourcePath
     )
     {
-        var ignoreCase = ctx.BuilderContext.MapperConfiguration.PropertyNameMappingStrategy == PropertyNameMappingStrategy.CaseInsensitive;
+        var ignoreCase = ctx.BuilderContext.Configuration.Mapper.PropertyNameMappingStrategy == PropertyNameMappingStrategy.CaseInsensitive;
 
         if (
-            ctx.BuilderContext
-                .SymbolAccessor
-                .TryFindMemberPath(
-                    ctx.Mapping.SourceType,
-                    MemberPathCandidateBuilder.BuildMemberPathCandidates(field.Name),
-                    ctx.IgnoredSourceMemberNames,
-                    ignoreCase,
-                    out sourcePath
-                )
+            ctx.BuilderContext.SymbolAccessor.TryFindMemberPath(
+                ctx.Mapping.SourceType,
+                MemberPathCandidateBuilder.BuildMemberPathCandidates(field.Name),
+                ctx.IgnoredSourceMemberNames,
+                ignoreCase,
+                out sourcePath
+            )
         )
         {
             return true;
@@ -201,19 +190,16 @@ public static class NewValueTupleMappingBodyBuilder
         if (!ctx.Mapping.SourceType.IsTupleType || ctx.Mapping.SourceType is not INamedTypeSymbol namedType)
             return false;
 
-        var mappableField = namedType
-            .TupleElements
-            .FirstOrDefault(
-                x =>
-                    x.CorrespondingTupleField != default
-                    && !ctx.IgnoredSourceMemberNames.Contains(x.Name)
-                    && string.Equals(field.CorrespondingTupleField!.Name, x.CorrespondingTupleField!.Name)
-            );
+        var mappableField = namedType.TupleElements.FirstOrDefault(x =>
+            x.CorrespondingTupleField != default
+            && !ctx.IgnoredSourceMemberNames.Contains(x.Name)
+            && string.Equals(field.CorrespondingTupleField!.Name, x.CorrespondingTupleField!.Name)
+        );
 
         if (mappableField == default)
             return false;
 
-        sourcePath = new MemberPath(new[] { new FieldMember(mappableField) });
+        sourcePath = new MemberPath(new[] { new FieldMember(mappableField, ctx.BuilderContext.SymbolAccessor) });
         return true;
     }
 }

@@ -3,13 +3,15 @@
 #nullable enable
 public partial class Mapper
 {
+    [global::System.CodeDom.Compiler.GeneratedCode("Riok.Mapperly", "0.0.1.0")]
     private partial void Map(global::A source, global::B target)
     {
-        var refHandler = new global::Riok.Mapperly.Internal.Tests.PreserveReferenceHandler();
+        var refHandler = new global::Riok.Mapperly.Abstractions.ReferenceHandling.PreserveReferenceHandler();
         target.Parent = MapToB(source.Parent, refHandler);
         target.Value = MapToD(source.Value, refHandler);
     }
 
+    [global::System.CodeDom.Compiler.GeneratedCode("Riok.Mapperly", "0.0.1.0")]
     private global::B MapToB(global::A source, global::Riok.Mapperly.Abstractions.ReferenceHandling.IReferenceHandler refHandler)
     {
         if (refHandler.TryGetReference<global::A, global::B>(source, out var existingTargetReference))
@@ -21,6 +23,7 @@ public partial class Mapper
         return target;
     }
 
+    [global::System.CodeDom.Compiler.GeneratedCode("Riok.Mapperly", "0.0.1.0")]
     private global::D MapToD(global::C source, global::Riok.Mapperly.Abstractions.ReferenceHandling.IReferenceHandler refHandler)
     {
         if (refHandler.TryGetReference<global::C, global::D>(source, out var existingTargetReference))

@@ -20,6 +20,7 @@ public class SimpleMappingBuilderContext(
     DiagnosticCollection diagnostics,
     MappingBuilder mappingBuilder,
     ExistingTargetMappingBuilder existingTargetMappingBuilder,
+    InlinedExpressionMappingCollection inlinedMappings,
     Location diagnosticLocation
 )
 {
@@ -38,12 +39,13 @@ public class SimpleMappingBuilderContext(
             ctx._diagnostics,
             ctx.MappingBuilder,
             ctx.ExistingTargetMappingBuilder,
+            ctx.InlinedMappings,
             diagnosticLocation ?? ctx._diagnosticLocation
         ) { }
 
     public Compilation Compilation => _compilationContext.Compilation;
 
-    public MapperAttribute MapperConfiguration => _configurationReader.Mapper;
+    public MappingConfiguration Configuration { get; protected init; } = configurationReader.MapperConfiguration;
 
     public WellKnownTypes Types => _compilationContext.Types;
 
@@ -57,11 +59,19 @@ public class SimpleMappingBuilderContext(
 
     protected ExistingTargetMappingBuilder ExistingTargetMappingBuilder { get; } = existingTargetMappingBuilder;
 
+    /// <summary>
+    /// The inline expression mappings.
+    /// Note: No method mappings should be added to this collection
+    /// and the body of these mappings is never built.
+    /// </summary>
+    protected InlinedExpressionMappingCollection InlinedMappings { get; } = inlinedMappings;
+
     public virtual bool IsConversionEnabled(MappingConversionType conversionType) =>
-        MapperConfiguration.EnabledConversions.HasFlag(conversionType);
+        Configuration.Mapper.EnabledConversions.HasFlag(conversionType);
 
     public void ReportDiagnostic(DiagnosticDescriptor descriptor, ISymbol? symbolLocation, params object[] messageArgs) =>
         _diagnostics.ReportDiagnostic(descriptor, symbolLocation?.GetSyntaxLocation() ?? _diagnosticLocation, messageArgs);
 
-    protected MappingConfiguration ReadConfiguration(MappingConfigurationReference configRef) => _configurationReader.BuildFor(configRef);
+    protected MappingConfiguration ReadConfiguration(MappingConfigurationReference configRef) =>
+        _configurationReader.BuildFor(configRef, _diagnostics);
 }

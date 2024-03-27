@@ -27,8 +27,8 @@ public class DerivedExistingTargetTypeSwitchMapping(
         var caseSections = existingTargetTypeMappings.Select(x => BuildSwitchSection(ctx, x));
         var defaultSection = BuildDefaultSwitchSection(ctx, target);
 
-        yield return ctx.SyntaxFactory
-            .SwitchStatement(sourceExpression, caseSections, defaultSection)
+        yield return ctx
+            .SyntaxFactory.SwitchStatement(sourceExpression, caseSections, defaultSection)
             .AddLeadingLineFeed(ctx.SyntaxFactory.Indentation);
     }
 
@@ -66,11 +66,11 @@ public class DerivedExistingTargetTypeSwitchMapping(
         var defaultCaseLabel = DefaultSwitchLabel().AddLeadingLineFeed(sectionCtx.Indentation);
 
         // throw new ArgumentException(msg, nameof(ctx.Source)),
-        var sourceType = Invocation(MemberAccess(ctx.Source, GetTypeMethodName));
-        var targetType = Invocation(MemberAccess(target, GetTypeMethodName));
+        var sourceTypeExpr = Invocation(MemberAccess(ctx.Source, GetTypeMethodName));
+        var targetTypeExpr = Invocation(MemberAccess(target, GetTypeMethodName));
         var statementContext = sectionCtx.AddIndentation();
         var throwExpression = ThrowArgumentExpression(
-                InterpolatedString($"Cannot map {sourceType} to {targetType} as there is no known derived type mapping"),
+                InterpolatedString($"Cannot map {sourceTypeExpr} to {targetTypeExpr} as there is no known derived type mapping"),
                 ctx.Source
             )
             .AddLeadingLineFeed(statementContext.Indentation);

@@ -1,6 +1,8 @@
 using System.Diagnostics.CodeAnalysis;
 using Microsoft.CodeAnalysis;
+using Riok.Mapperly.Abstractions;
 using Riok.Mapperly.Abstractions.ReferenceHandling;
+using Riok.Mapperly.Configuration;
 using Riok.Mapperly.Descriptors.Mappings;
 using Riok.Mapperly.Descriptors.Mappings.UserMappings;
 using Riok.Mapperly.Diagnostics;
@@ -14,11 +16,19 @@ public static class UserMethodMappingExtractor
     internal static IEnumerable<IUserMapping> ExtractUserMappings(SimpleMappingBuilderContext ctx, ITypeSymbol mapperSymbol)
     {
         // extract user implemented and user defined mappings from mapper
-        foreach (var methodSymbol in ExtractMethods(mapperSymbol))
+        var methods = mapperSymbol.GetMembers().OfType<IMethodSymbol>().Where(method => IsMappingMethodCandidate(ctx, method));
+        foreach (var method in methods)
         {
             var mapping =
-                BuilderUserDefinedMapping(ctx, methodSymbol)
-                ?? BuildUserImplementedMapping(ctx, methodSymbol, receiver: null, allowPartial: false, mapperSymbol.IsStatic);
+                BuilderUserDefinedMapping(ctx, method)
+                ?? BuildUserImplementedMapping(
+                    ctx,
+                    method,
+                    receiver: null,
+                    allowPartial: false,
+                    isStatic: mapperSymbol.IsStatic,
+                    isExternal: false
+                );
             if (mapping != null)
                 yield return mapping;
         }
@@ -28,36 +38,55 @@ public static class UserMethodMappingExtractor
             yield break;
 
         // extract user implemented mappings from base methods
-        var methods = mapperSymbol.AllInterfaces.SelectMany(ctx.SymbolAccessor.GetAllMethods);
+        var baseAndInterfaceMethods = mapperSymbol.AllInterfaces.SelectMany(ctx.SymbolAccessor.GetAllMethods);
         if (mapperSymbol.BaseType is { } mapperBaseSymbol)
         {
-            methods = methods.Concat(ctx.SymbolAccessor.GetAllMethods(mapperBaseSymbol));
+            baseAndInterfaceMethods = baseAndInterfaceMethods.Concat(ctx.SymbolAccessor.GetAllMethods(mapperBaseSymbol));
         }
 
-        foreach (var mapping in BuildUserImplementedMappings(ctx, methods, null, false))
+        baseAndInterfaceMethods = baseAndInterfaceMethods.Distinct(SymbolTypeEqualityComparer.MethodDefault);
+
+        foreach (var mapping in BuildUserImplementedMappings(ctx, baseAndInterfaceMethods, null, isStatic: false, isExternal: true))
         {
             yield return mapping;
         }
+    }
+
+    internal static IEnumerable<INewInstanceUserMapping> ExtractNamedUserImplementedNewInstanceMappings(
+        SimpleMappingBuilderContext ctx,
+        ITypeSymbol mapperSymbol,
+        string name
+    )
+    {
+        return mapperSymbol
+            .GetMembers(name)
+            .OfType<IMethodSymbol>()
+            .Where(m => IsMappingMethodCandidate(ctx, m, requireAttribute: false))
+            .Select(m => BuildUserImplementedMapping(ctx, m, null, allowPartial: true, isStatic: mapperSymbol.IsStatic, isExternal: false))
+            .OfType<INewInstanceUserMapping>();
     }
 
     internal static IEnumerable<IUserMapping> ExtractUserImplementedMappings(
         SimpleMappingBuilderContext ctx,
         ITypeSymbol type,
         string? receiver,
-        bool isStatic
+        bool isStatic,
+        bool isExternal
     )
     {
-        var methods = ctx.SymbolAccessor.GetAllMethods(type).Concat(type.AllInterfaces.SelectMany(ctx.SymbolAccessor.GetAllMethods));
-        return BuildUserImplementedMappings(ctx, methods, receiver, isStatic);
+        var methods = ctx
+            .SymbolAccessor.GetAllMethods(type)
+            .Concat(type.AllInterfaces.SelectMany(ctx.SymbolAccessor.GetAllMethods))
+            .Distinct(SymbolTypeEqualityComparer.MethodDefault);
+        return BuildUserImplementedMappings(ctx, methods, receiver, isStatic, isExternal);
     }
-
-    private static IEnumerable<IMethodSymbol> ExtractMethods(ITypeSymbol mapperSymbol) => mapperSymbol.GetMembers().OfType<IMethodSymbol>();
 
     private static IEnumerable<IUserMapping> BuildUserImplementedMappings(
         SimpleMappingBuilderContext ctx,
         IEnumerable<IMethodSymbol> methods,
         string? receiver,
-        bool isStatic
+        bool isStatic,
+        bool isExternal
     )
     {
         foreach (var method in methods)
@@ -69,18 +98,25 @@ public static class UserMethodMappingExtractor
             // but still treated as user implemented methods,
             // since the user should provide an implementation elsewhere.
             // This is the case if a partial mapper class is extended.
-            var mapping = BuildUserImplementedMapping(ctx, method, receiver, true, isStatic);
+            var mapping = BuildUserImplementedMapping(ctx, method, receiver, true, isStatic, isExternal);
             if (mapping != null)
                 yield return mapping;
         }
     }
 
-    private static bool IsMappingMethodCandidate(SimpleMappingBuilderContext ctx, IMethodSymbol method)
+    private static bool IsMappingMethodCandidate(SimpleMappingBuilderContext ctx, IMethodSymbol method, bool requireAttribute = true)
     {
+        requireAttribute &= !ctx.Configuration.Mapper.AutoUserMappings;
+
         // ignore all non ordinary methods (eg. ctor, operators, etc.) and methods declared on the object type (eg. ToString)
         return method.MethodKind == MethodKind.Ordinary
             && ctx.SymbolAccessor.IsDirectlyAccessible(method)
-            && !SymbolEqualityComparer.Default.Equals(method.ReceiverType, ctx.Compilation.ObjectType);
+            && !SymbolEqualityComparer.Default.Equals(method.ReceiverType, ctx.Compilation.ObjectType)
+            && (
+                !requireAttribute
+                || ctx.SymbolAccessor.HasAttribute<UserMappingAttribute>(method)
+                || method.IsPartialDefinition && ctx.SymbolAccessor.HasAttribute<MapperAttribute>(method.ContainingType)
+            );
     }
 
     private static IUserMapping? BuildUserImplementedMapping(
@@ -88,25 +124,49 @@ public static class UserMethodMappingExtractor
         IMethodSymbol method,
         string? receiver,
         bool allowPartial,
-        bool isStatic
+        bool isStatic,
+        bool isExternal
     )
     {
+        var userMappingConfig = GetUserMappingConfig(ctx, method, out var hasAttribute);
         var valid = !method.IsGenericMethod && (allowPartial || !method.IsPartialDefinition) && (!isStatic || method.IsStatic);
 
         if (!valid || !BuildParameters(ctx, method, out var parameters))
         {
+            if (hasAttribute)
+            {
+                var name = receiver == null ? method.Name : receiver + method.Name;
+                ctx.ReportDiagnostic(DiagnosticDescriptors.UnsupportedMappingMethodSignature, method, name);
+            }
+
             return null;
         }
 
-        return method.ReturnsVoid
-            ? new UserImplementedExistingTargetMethodMapping(
+        if (userMappingConfig.Ignore == true)
+            return null;
+
+        if (method.ReturnsVoid)
+        {
+            return new UserImplementedExistingTargetMethodMapping(
                 receiver,
                 method,
+                userMappingConfig.Default,
                 parameters.Source,
                 parameters.Target!.Value,
-                parameters.ReferenceHandler
-            )
-            : new UserImplementedMethodMapping(receiver, method, parameters.Source, parameters.ReferenceHandler);
+                parameters.ReferenceHandler,
+                isExternal
+            );
+        }
+
+        return new UserImplementedMethodMapping(
+            receiver,
+            method,
+            userMappingConfig.Default,
+            parameters.Source,
+            ctx.SymbolAccessor.UpgradeNullable(method.ReturnType),
+            parameters.ReferenceHandler,
+            isExternal
+        );
     }
 
     private static IUserMapping? BuilderUserDefinedMapping(SimpleMappingBuilderContext ctx, IMethodSymbol methodSymbol)
@@ -125,9 +185,10 @@ public static class UserMethodMappingExtractor
             return new UserDefinedNewInstanceRuntimeTargetTypeParameterMapping(
                 methodSymbol,
                 runtimeTargetTypeParams,
-                ctx.MapperConfiguration.UseReferenceHandling,
+                ctx.Configuration.Mapper.UseReferenceHandling,
+                ctx.SymbolAccessor.UpgradeNullable(methodSymbol.ReturnType),
                 GetTypeSwitchNullArm(methodSymbol, runtimeTargetTypeParams, null),
-                ctx.Compilation.ObjectType
+                ctx.Compilation.ObjectType.WithNullableAnnotation(NullableAnnotation.NotAnnotated)
             );
         }
 
@@ -143,9 +204,10 @@ public static class UserMethodMappingExtractor
                 methodSymbol,
                 typeParameters.Value,
                 parameters,
-                ctx.MapperConfiguration.UseReferenceHandling,
+                ctx.SymbolAccessor.UpgradeNullable(methodSymbol.ReturnType),
+                ctx.Configuration.Mapper.UseReferenceHandling,
                 GetTypeSwitchNullArm(methodSymbol, parameters, typeParameters),
-                ctx.Compilation.ObjectType
+                ctx.Compilation.ObjectType.WithNullableAnnotation(NullableAnnotation.NotAnnotated)
             );
         }
 
@@ -162,15 +224,18 @@ public static class UserMethodMappingExtractor
                 parameters.Source,
                 parameters.Target.Value,
                 parameters.ReferenceHandler,
-                ctx.MapperConfiguration.UseReferenceHandling
+                ctx.Configuration.Mapper.UseReferenceHandling
             );
         }
 
+        var userMappingConfig = GetUserMappingConfig(ctx, methodSymbol, out _);
         return new UserDefinedNewInstanceMethodMapping(
             methodSymbol,
+            userMappingConfig.Default,
             parameters.Source,
             parameters.ReferenceHandler,
-            ctx.MapperConfiguration.UseReferenceHandling
+            ctx.SymbolAccessor.UpgradeNullable(methodSymbol.ReturnType),
+            ctx.Configuration.Mapper.UseReferenceHandling
         );
     }
 
@@ -186,11 +251,11 @@ public static class UserMethodMappingExtractor
             return false;
         }
 
-        var targetType = parameters.Target?.Type ?? methodSymbol.ReturnType.UpgradeNullable();
+        var targetType = parameters.Target?.Type ?? methodSymbol.ReturnType;
         var targetTypeParameter = methodSymbol.TypeParameters.FirstOrDefault(x => SymbolEqualityComparer.Default.Equals(x, targetType));
-        var sourceTypeParameter = methodSymbol
-            .TypeParameters
-            .FirstOrDefault(x => SymbolEqualityComparer.Default.Equals(x, parameters.Source.Type));
+        var sourceTypeParameter = methodSymbol.TypeParameters.FirstOrDefault(x =>
+            SymbolEqualityComparer.Default.Equals(x, parameters.Source.Type)
+        );
 
         var expectedTypeParametersCount = 0;
         if (targetTypeParameter != null)
@@ -209,12 +274,7 @@ public static class UserMethodMappingExtractor
             return false;
         }
 
-        typeParameters = new GenericMappingTypeParameters(
-            sourceTypeParameter,
-            parameters.Source.Type.NullableAnnotation,
-            targetTypeParameter,
-            targetType.NullableAnnotation
-        );
+        typeParameters = new GenericMappingTypeParameters(sourceTypeParameter, targetTypeParameter);
         return true;
     }
 
@@ -235,24 +295,31 @@ public static class UserMethodMappingExtractor
         }
 
         // source parameter is the first parameter (except if the reference handler is the first parameter)
-        var sourceParameter = MethodParameter.Wrap(method.Parameters.FirstOrDefault(p => p.Ordinal != refHandlerParameterOrdinal));
-        expectedParametersCount++;
-        if (sourceParameter == null)
+        var sourceParameterSymbol = method.Parameters.FirstOrDefault(p => p.Ordinal != refHandlerParameterOrdinal);
+        if (sourceParameterSymbol == null)
         {
             parameters = null;
             return false;
         }
 
-        // target type parameter is the second parameter (except if the reference handler is the first or the second parameter)
-        var targetTypeParameter = MethodParameter.Wrap(
-            method.Parameters.FirstOrDefault(p => p.Ordinal != sourceParameter.Value.Ordinal && p.Ordinal != refHandlerParameterOrdinal)
-        );
+        var sourceParameter = ctx.SymbolAccessor.WrapMethodParameter(sourceParameterSymbol);
         expectedParametersCount++;
-        if (targetTypeParameter == null || !SymbolEqualityComparer.Default.Equals(targetTypeParameter.Value.Type, ctx.Types.Get<Type>()))
+
+        // target type parameter is the second parameter (except if the reference handler is the first or the second parameter)
+        var targetTypeParameterSymbol = method.Parameters.FirstOrDefault(p =>
+            p.Ordinal != sourceParameter.Ordinal && p.Ordinal != refHandlerParameterOrdinal
+        );
+        if (
+            targetTypeParameterSymbol == null
+            || !SymbolEqualityComparer.Default.Equals(targetTypeParameterSymbol.Type, ctx.Types.Get<Type>())
+        )
         {
             parameters = null;
             return false;
         }
+
+        var targetTypeParameter = ctx.SymbolAccessor.WrapMethodParameter(targetTypeParameterSymbol);
+        expectedParametersCount++;
 
         if (method.Parameters.Length != expectedParametersCount)
         {
@@ -260,7 +327,7 @@ public static class UserMethodMappingExtractor
             return false;
         }
 
-        parameters = new RuntimeTargetTypeMappingMethodParameters(sourceParameter.Value, targetTypeParameter.Value, refHandlerParameter);
+        parameters = new RuntimeTargetTypeMappingMethodParameters(sourceParameter, targetTypeParameter, refHandlerParameter);
         return true;
     }
 
@@ -281,18 +348,20 @@ public static class UserMethodMappingExtractor
         }
 
         // source parameter is the first parameter (except if the reference handler is the first parameter)
-        var sourceParameter = MethodParameter.Wrap(method.Parameters.FirstOrDefault(p => p.Ordinal != refHandlerParameterOrdinal));
-        if (sourceParameter == null)
+        var sourceParameterSymbol = method.Parameters.FirstOrDefault(p => p.Ordinal != refHandlerParameterOrdinal);
+        if (sourceParameterSymbol == null)
         {
             parameters = null;
             return false;
         }
 
+        var sourceParameter = ctx.SymbolAccessor.WrapMethodParameter(sourceParameterSymbol);
+
         // target parameter is the second parameter (except if the reference handler is the first or the second parameter)
         // if the method returns void, a target parameter is required
         // if the method doesnt return void, a target parameter is not allowed
-        var targetParameter = MethodParameter.Wrap(
-            method.Parameters.FirstOrDefault(p => p.Ordinal != sourceParameter.Value.Ordinal && p.Ordinal != refHandlerParameterOrdinal)
+        var targetParameter = ctx.SymbolAccessor.WrapOptionalMethodParameter(
+            method.Parameters.FirstOrDefault(p => p.Ordinal != sourceParameter.Ordinal && p.Ordinal != refHandlerParameterOrdinal)
         );
         if (method.ReturnsVoid == !targetParameter.HasValue)
         {
@@ -311,19 +380,19 @@ public static class UserMethodMappingExtractor
             return false;
         }
 
-        parameters = new MappingMethodParameters(sourceParameter.Value, targetParameter, refHandlerParameter);
+        parameters = new MappingMethodParameters(sourceParameter, targetParameter, refHandlerParameter);
         return true;
     }
 
     private static MethodParameter? BuildReferenceHandlerParameter(SimpleMappingBuilderContext ctx, IMethodSymbol method)
     {
-        var refHandlerParameterSymbol = method
-            .Parameters
-            .FirstOrDefault(p => ctx.SymbolAccessor.HasAttribute<ReferenceHandlerAttribute>(p));
+        var refHandlerParameterSymbol = method.Parameters.FirstOrDefault(p =>
+            ctx.SymbolAccessor.HasAttribute<ReferenceHandlerAttribute>(p)
+        );
         if (refHandlerParameterSymbol == null)
             return null;
 
-        var refHandlerParameter = new MethodParameter(refHandlerParameterSymbol);
+        var refHandlerParameter = ctx.SymbolAccessor.WrapMethodParameter(refHandlerParameterSymbol);
         if (!SymbolEqualityComparer.Default.Equals(ctx.Types.Get<IReferenceHandler>(), refHandlerParameter.Type))
         {
             ctx.ReportDiagnostic(
@@ -336,7 +405,7 @@ public static class UserMethodMappingExtractor
             );
         }
 
-        if (!ctx.MapperConfiguration.UseReferenceHandling)
+        if (!ctx.Configuration.Mapper.UseReferenceHandling)
         {
             ctx.ReportDiagnostic(
                 DiagnosticDescriptors.ReferenceHandlingNotEnabled,
@@ -357,5 +426,16 @@ public static class UserMethodMappingExtractor
     {
         var targetCanBeNull = typeParameters?.TargetNullable ?? parameters.Target?.Type.IsNullable() ?? method.ReturnType.IsNullable();
         return targetCanBeNull ? NullFallbackValue.Default : NullFallbackValue.ThrowArgumentNullException;
+    }
+
+    private static UserMappingConfiguration GetUserMappingConfig(
+        SimpleMappingBuilderContext ctx,
+        IMethodSymbol method,
+        out bool hasAttribute
+    )
+    {
+        var userMappingAttr = ctx.AttributeAccessor.AccessFirstOrDefault<UserMappingAttribute, UserMappingConfiguration>(method);
+        hasAttribute = userMappingAttr != null;
+        return userMappingAttr ?? new UserMappingConfiguration();
     }
 }

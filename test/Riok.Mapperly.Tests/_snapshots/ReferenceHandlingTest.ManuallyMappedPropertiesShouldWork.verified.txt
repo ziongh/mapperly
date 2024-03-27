@@ -5,7 +5,7 @@
       Title: Source member was not found for target member,
       Severity: Info,
       WarningLevel: 1,
-      Location: : (10,4)-(10,73),
+      Location: : (11,4)-(11,73),
       MessageFormat: The member {0} on the mapping target type {1} was not found on the mapping source type {2},
       Message: The member MyValue2 on the mapping target type B was not found on the mapping source type A,
       Category: Mapper
@@ -15,9 +15,20 @@
       Title: Source member was not found for target member,
       Severity: Info,
       WarningLevel: 1,
-      Location: : (10,73)-(10,144),
+      Location: : (12,0)-(12,71),
       MessageFormat: The member {0} on the mapping target type {1} was not found on the mapping source type {2},
       Message: The member MyValue on the mapping target type B was not found on the mapping source type A,
+      Category: Mapper
+    },
+    {
+      Id: RMG060,
+      Title: Multiple user mappings discovered without specifying an explicit default,
+      Severity: Warning,
+      WarningLevel: 1,
+      Location: : (12,0)-(12,71),
+      HelpLink: https://localhost:3000/docs/configuration/analyzer-diagnostics/RMG060,
+      MessageFormat: Multiple user mappings discovered for the mapping from {0} to {1} without specifying an explicit default,
+      Message: Multiple user mappings discovered for the mapping from A to B without specifying an explicit default,
       Category: Mapper
     }
   ]

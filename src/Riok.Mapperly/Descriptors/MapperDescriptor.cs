@@ -5,7 +5,6 @@ using Riok.Mapperly.Descriptors.Mappings;
 using Riok.Mapperly.Descriptors.Mappings.MemberMappings.UnsafeAccess;
 using Riok.Mapperly.Helpers;
 using Riok.Mapperly.Symbols;
-using Riok.Mapperly.Templates;
 
 namespace Riok.Mapperly.Descriptors;
 
@@ -14,7 +13,6 @@ public class MapperDescriptor
     private readonly MapperDeclaration _declaration;
     private readonly List<MethodMapping> _methodMappings = new();
     private readonly List<IUnsafeAccessor> _unsafeAccessors = new();
-    private readonly HashSet<TemplateReference> _requiredTemplates = new();
 
     public bool Static { get; set; }
 
@@ -40,17 +38,13 @@ public class MapperDescriptor
 
     public UniqueNameBuilder NameBuilder { get; }
 
-    public IReadOnlyCollection<TemplateReference> RequiredTemplates => _requiredTemplates;
-
-    public IReadOnlyCollection<MethodMapping> MethodTypeMappings => _methodMappings;
+    public IReadOnlyCollection<MethodMapping> MethodMappings => _methodMappings;
 
     public IReadOnlyCollection<IUnsafeAccessor> UnsafeAccessors => _unsafeAccessors;
 
-    public void AddRequiredTemplate(TemplateReference template) => _requiredTemplates.Add(template);
+    public void AddMethodMappings(IReadOnlyCollection<MethodMapping> mappings) => _methodMappings.AddRange(mappings);
 
-    public void AddTypeMapping(MethodMapping mapping) => _methodMappings.Add(mapping);
-
-    public void AddUnsafeAccessors(IEnumerable<IUnsafeAccessor> accessors) => _unsafeAccessors.AddRange(accessors);
+    public void AddUnsafeAccessors(IReadOnlyCollection<IUnsafeAccessor> accessors) => _unsafeAccessors.AddRange(accessors);
 
     private string BuildName(INamedTypeSymbol symbol)
     {

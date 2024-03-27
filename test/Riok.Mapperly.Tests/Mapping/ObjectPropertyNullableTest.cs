@@ -1,6 +1,7 @@
+using Riok.Mapperly.Diagnostics;
+
 namespace Riok.Mapperly.Tests.Mapping;
 
-[UsesVerify]
 public class ObjectPropertyNullableTest
 {
     [Fact]
@@ -146,8 +147,8 @@ public class ObjectPropertyNullableTest
             "B",
             "class A { public C? Value { get; set; } }",
             "class B { public D Value { get; set; } }",
-            "class C { public string V {get; set; } }",
-            "class D { public string V {get; set; } }"
+            "class C { public string V { get; set; } }",
+            "class D { public string V { get; set; } }"
         );
 
         TestHelper
@@ -281,8 +282,8 @@ public class ObjectPropertyNullableTest
             "B",
             "class A { public C Value { get; set; } }",
             "class B { public D? Value { get; set; } }",
-            "class C { public string V {get; set; } }",
-            "class D { public string V {get; set; } }"
+            "class C { public string V { get; set; } }",
+            "class D { public string V { get; set; } }"
         );
 
         TestHelper
@@ -305,8 +306,8 @@ public class ObjectPropertyNullableTest
             "B",
             "class A { public C? Value { get; set; } }",
             "class B { public D? Value { get; set; } }",
-            "class C { public string V {get; set; } }",
-            "class D { public string V {get; set; } }"
+            "class C { public string V { get; set; } }",
+            "class D { public string V { get; set; } }"
         );
 
         TestHelper
@@ -340,8 +341,8 @@ public class ObjectPropertyNullableTest
             },
             "class A { public C? Value { get; set; } }",
             "class B { public D? Value { get; set; } }",
-            "class C { public string V {get; set; } }",
-            "class D { public string V {get; set; } }"
+            "class C { public string V { get; set; } }",
+            "class D { public string V { get; set; } }"
         );
 
         TestHelper
@@ -372,8 +373,8 @@ public class ObjectPropertyNullableTest
             },
             "class A { public C? Value { get; set; } }",
             "class B { public D? Value { get; set; } }",
-            "class C { public string V {get; set; } }",
-            "class D { public string V {get; set; } }"
+            "class C { public string V { get; set; } }",
+            "class D { public string V { get; set; } }"
         );
 
         TestHelper
@@ -403,8 +404,8 @@ public class ObjectPropertyNullableTest
             "B",
             "#nullable disable\n class A { public C Value { get; set; } }\n#nullable enable",
             "class B { public D Value { get; set; } }",
-            "class C { public string V {get; set; } }",
-            "class D { public string V {get; set; } }"
+            "class C { public string V { get; set; } }",
+            "class D { public string V { get; set; } }"
         );
 
         TestHelper
@@ -430,8 +431,8 @@ public class ObjectPropertyNullableTest
             "B",
             "class A { public C? Value { get; set; } }",
             "#nullable disable\n class B { public D Value { get; set; } }\n#nullable enable",
-            "class C { public string V {get; set; } }",
-            "class D { public string V {get; set; } }"
+            "class C { public string V { get; set; } }",
+            "class D { public string V { get; set; } }"
         );
 
         TestHelper
@@ -494,8 +495,8 @@ public class ObjectPropertyNullableTest
             },
             "class A { public C? Value { get; set; } }",
             "class B { public D Value { get; set; } }",
-            "class C { public string V {get; set; } }",
-            "class D { public string V {get; set; } }"
+            "class C { public string V { get; set; } }",
+            "class D { public string V { get; set; } }"
         );
 
         TestHelper
@@ -507,6 +508,89 @@ public class ObjectPropertyNullableTest
                 if (source.Value != null)
                 {
                     target.Value = MapToD(source.Value);
+                }
+                else
+                {
+                    throw new System.ArgumentNullException(nameof(source.Value));
+                }
+                return target;
+                """
+            );
+    }
+
+    [Fact]
+    public void NullableClassToNullableClassPropertyThrowShouldSetNull()
+    {
+        var source = TestSourceBuilder.Mapping(
+            "A",
+            "B",
+            TestSourceBuilderOptions.Default with
+            {
+                ThrowOnPropertyMappingNullMismatch = true
+            },
+            "class A { public C? Value { get; set; } }",
+            "class B { public D? Value { get; set; } }",
+            "class C { public string V { get; set; } }",
+            "class D { public string V { get; set; } }"
+        );
+
+        TestHelper
+            .GenerateMapper(source)
+            .Should()
+            .HaveMapMethodBody(
+                """
+                var target = new global::B();
+                if (source.Value != null)
+                {
+                    target.Value = MapToD(source.Value);
+                }
+                else
+                {
+                    target.Value = null;
+                }
+                return target;
+                """
+            );
+    }
+
+    [Fact]
+    public void NullableClassToNullableClassFlattenedPropertyThrow()
+    {
+        // the flattened property is not nullable
+        // therefore if source.Value is null
+        // an exception should be thrown
+        // instead of assigning null to target.Value.
+        var source = TestSourceBuilder.MapperWithBodyAndTypes(
+            """
+            [MapProperty("Value", "Value")]
+            [MapProperty("Value.Flattened", "ValueFlattened")]
+            partial B Map(A source);
+            """,
+            TestSourceBuilderOptions.Default with
+            {
+                ThrowOnPropertyMappingNullMismatch = true
+            },
+            "class A { public C? Value { get; set; } }",
+            "class B { public D? Value { get; set; } public string ValueFlattened { get; set; } }",
+            "class C { public string V { get; set; } public string Flattened { get; set; } }",
+            "class D { public string V { get; set; } }"
+        );
+
+        TestHelper
+            .GenerateMapper(source, TestHelperOptions.AllowInfoDiagnostics)
+            .Should()
+            .HaveDiagnostic(
+                DiagnosticDescriptors.SourceMemberNotMapped,
+                "The member Flattened on the mapping source type C is not mapped to any member on the mapping target type D"
+            )
+            .HaveAssertedAllDiagnostics()
+            .HaveMapMethodBody(
+                """
+                var target = new global::B();
+                if (source.Value != null)
+                {
+                    target.Value = MapToD(source.Value);
+                    target.ValueFlattened = source.Value.Flattened;
                 }
                 else
                 {
@@ -555,9 +639,9 @@ public class ObjectPropertyNullableTest
     {
         var mapperBody = TestSourceBuilder.CSharp(
             """
-                partial NotNullableType? To(TypeWithNullableProperty? y);
-                public Wrapper Map(double? source) => source.HasValue ? new() { Test = source.Value } : new();
-                """
+            partial NotNullableType? To(TypeWithNullableProperty? y);
+            public Wrapper Map(double? source) => source.HasValue ? new() { Test = source.Value } : new();
+            """
         );
 
         var source = TestSourceBuilder.MapperWithBodyAndTypes(
@@ -586,9 +670,9 @@ public class ObjectPropertyNullableTest
     {
         var mapperBody = TestSourceBuilder.CSharp(
             """
-                partial NotNullableType? To(TypeWithNullableProperty? y);
-                public Wrapper Map(double source) => new() { Test = source.Value };
-                """
+            partial NotNullableType? To(TypeWithNullableProperty? y);
+            public Wrapper Map(double source) => new() { Test = source.Value };
+            """
         );
 
         var source = TestSourceBuilder.MapperWithBodyAndTypes(
@@ -664,6 +748,36 @@ public class ObjectPropertyNullableTest
     }
 
     [Fact]
+    public Task ShouldUpgradeNullabilityInDisabledNullableContextInGenericProperty()
+    {
+        var source = TestSourceBuilder.Mapping(
+            "A",
+            "B",
+            "class A { public IEnumerable<C> Value { get; set;} }",
+            "class B { public IReadOnlyCollection<D> Value { get; set; } }",
+            "class C { public string Value { get; set; } }",
+            "class D { public string Value { get; set; } }"
+        );
+
+        return TestHelper.VerifyGenerator(source, TestHelperOptions.DisabledNullable);
+    }
+
+    [Fact]
+    public Task ShouldUpgradeNullabilityInDisabledNullableContextInArrayProperty()
+    {
+        var source = TestSourceBuilder.Mapping(
+            "A",
+            "B",
+            "class A { public C[] Value { get; set;} }",
+            "class B { public D[] Value { get; set; } }",
+            "class C { public string Value { get; set; } }",
+            "class D { public string Value { get; set; } }"
+        );
+
+        return TestHelper.VerifyGenerator(source, TestHelperOptions.DisabledNullable);
+    }
+
+    [Fact]
     public Task NullableIntWithAdditionalFlattenedValueToNonNullableIntProperties()
     {
         var source = TestSourceBuilder.Mapping(
@@ -676,5 +790,78 @@ public class ObjectPropertyNullableTest
         );
 
         return TestHelper.VerifyGenerator(source);
+    }
+
+    [Fact]
+    public void NullableDirectiveEnabledTargetWithSameNullableRefTypeAsPropertyAndInEnumerable()
+    {
+        var source = TestSourceBuilder.Mapping(
+            "A",
+            "B",
+            "class A { public string Value { get; set; } public string[] Descriptions { get; set; } }",
+            "#nullable disable\n class B { public string Value { get; set; } public string[] Descriptions { get; set; } }\n#nullable enable"
+        );
+
+        TestHelper
+            .GenerateMapper(source)
+            .Should()
+            .HaveMapMethodBody(
+                """
+                var target = new global::B();
+                target.Value = source.Value;
+                target.Descriptions = (string?[])source.Descriptions;
+                return target;
+                """
+            );
+    }
+
+    [Fact]
+    public Task NullableToNullablePropertyWithAnotherNullableToNonNullableMappingShouldDirectAssign()
+    {
+        // see https://github.com/riok/mapperly/issues/1089
+        var source = TestSourceBuilder.MapperWithBodyAndTypes(
+            """
+            public static partial ADest? Map(A? source);
+            public static partial BDest MapToDestinationB(B source);
+            """,
+            "public record A(int? Prop);",
+            "public record B(List<int?> Prop);",
+            "public record ADest(int? Prop);",
+            "public record BDest(List<int> Prop);"
+        );
+
+        return TestHelper.VerifyGenerator(source);
+    }
+
+    [Fact]
+    public void ClassToRecordNoAccessibleSourceCtorShouldNotDiagnostic()
+    {
+        var source = TestSourceBuilder.Mapping(
+            "A",
+            "B",
+            """
+            public class A
+            {
+                private A(C value)
+                {
+                    Value = value;
+                }
+
+                public C Value { get; }
+            }
+            """,
+            "public record B(C Value);",
+            "public record C(string StringValue);"
+        );
+
+        TestHelper
+            .GenerateMapper(source)
+            .Should()
+            .HaveMapMethodBody(
+                """
+                var target = new global::B(source.Value);
+                return target;
+                """
+            );
     }
 }

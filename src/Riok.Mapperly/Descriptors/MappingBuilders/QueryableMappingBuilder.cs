@@ -7,7 +7,7 @@ namespace Riok.Mapperly.Descriptors.MappingBuilders;
 
 public static class QueryableMappingBuilder
 {
-    public static NewInstanceMapping? TryBuildMapping(MappingBuilderContext ctx)
+    public static INewInstanceMapping? TryBuildMapping(MappingBuilderContext ctx)
     {
         if (!ctx.IsConversionEnabled(MappingConversionType.Queryable))
             return null;
@@ -27,7 +27,7 @@ public static class QueryableMappingBuilder
         if (mapping == null)
             return null;
 
-        if (ctx.MapperConfiguration.UseReferenceHandling)
+        if (ctx.Configuration.Mapper.UseReferenceHandling)
         {
             ctx.ReportDiagnostic(DiagnosticDescriptors.QueryableProjectionMappingsDoNotSupportReferenceHandling);
         }

@@ -1,6 +1,8 @@
+using Microsoft.CodeAnalysis;
 using Riok.Mapperly.Abstractions;
 using Riok.Mapperly.Configuration;
 using Riok.Mapperly.Descriptors.Mappings;
+using Riok.Mapperly.Descriptors.Mappings.MemberMappings;
 using Riok.Mapperly.Diagnostics;
 using Riok.Mapperly.Helpers;
 using Riok.Mapperly.Symbols;
@@ -20,6 +22,8 @@ public abstract class MembersMappingBuilderContext<T> : IMembersBuilderContext<T
     private readonly IReadOnlyCollection<string> _ignoredUnmatchedTargetMemberNames;
     private readonly IReadOnlyCollection<string> _ignoredUnmatchedSourceMemberNames;
 
+    private bool _hasMemberMapping;
+
     protected MembersMappingBuilderContext(MappingBuilderContext builderContext, T mapping)
     {
         BuilderContext = builderContext;
@@ -30,21 +34,17 @@ public abstract class MembersMappingBuilderContext<T> : IMembersBuilderContext<T
         TargetMembers = GetTargetMembers();
 
         IgnoredSourceMemberNames = builderContext
-            .Configuration
-            .Properties
-            .IgnoredSources
+            .Configuration.Members.IgnoredSources.Concat(GetIgnoredSourceMembers())
             .Concat(GetIgnoredObsoleteSourceMembers())
             .ToHashSet();
         var ignoredTargetMemberNames = builderContext
-            .Configuration
-            .Properties
-            .IgnoredTargets
+            .Configuration.Members.IgnoredTargets.Concat(GetIgnoredTargetMembers())
             .Concat(GetIgnoredObsoleteTargetMembers())
             .ToHashSet();
 
         _ignoredUnmatchedSourceMemberNames = InitIgnoredUnmatchedProperties(IgnoredSourceMemberNames, _unmappedSourceMemberNames);
         _ignoredUnmatchedTargetMemberNames = InitIgnoredUnmatchedProperties(
-            builderContext.Configuration.Properties.IgnoredTargets,
+            builderContext.Configuration.Members.IgnoredTargets,
             TargetMembers.Keys
         );
 
@@ -54,8 +54,7 @@ public abstract class MembersMappingBuilderContext<T> : IMembersBuilderContext<T
 
         // source and target properties may have been ignored and mapped explicitly
         _mappedAndIgnoredSourceMemberNames = MemberConfigsByRootTargetName
-            .Values
-            .SelectMany(v => v.Select(s => s.Source.Path.First()))
+            .Values.SelectMany(v => v.Select(s => s.Source.Path.First()))
             .ToHashSet();
         _mappedAndIgnoredSourceMemberNames.IntersectWith(IgnoredSourceMemberNames);
 
@@ -77,7 +76,24 @@ public abstract class MembersMappingBuilderContext<T> : IMembersBuilderContext<T
 
     public Dictionary<string, IMappableMember> TargetMembers { get; }
 
-    public Dictionary<string, List<PropertyMappingConfiguration>> MemberConfigsByRootTargetName { get; }
+    public Dictionary<string, List<MemberMappingConfiguration>> MemberConfigsByRootTargetName { get; }
+
+    public NullMemberMapping BuildNullMemberMapping(
+        MemberPath sourcePath,
+        INewInstanceMapping delegateMapping,
+        ITypeSymbol targetMemberType
+    )
+    {
+        var getterSourcePath = GetterMemberPath.Build(BuilderContext, sourcePath);
+
+        var nullFallback = NullFallbackValue.Default;
+        if (!delegateMapping.SourceType.IsNullable() && sourcePath.IsAnyNullable())
+        {
+            nullFallback = BuilderContext.GetNullFallbackValue(targetMemberType);
+        }
+
+        return new NullMemberMapping(delegateMapping, getterSourcePath, targetMemberType, nullFallback, !BuilderContext.IsExpression);
+    }
 
     public void AddDiagnostics()
     {
@@ -87,9 +103,14 @@ public abstract class MembersMappingBuilderContext<T> : IMembersBuilderContext<T
         AddUnmatchedSourceMembersDiagnostics();
         AddMappedAndIgnoredSourceMembersDiagnostics();
         AddMappedAndIgnoredTargetMembersDiagnostics();
+        AddNoMemberMappedDiagnostic();
     }
 
-    protected void SetSourceMemberMapped(MemberPath sourcePath) => _unmappedSourceMemberNames.Remove(sourcePath.Path.First().Name);
+    protected void SetSourceMemberMapped(MemberPath sourcePath)
+    {
+        _hasMemberMapping = true;
+        _unmappedSourceMemberNames.Remove(sourcePath.Path.First().Name);
+    }
 
     private HashSet<string> InitIgnoredUnmatchedProperties(IEnumerable<string> allProperties, IEnumerable<string> mappedProperties)
     {
@@ -100,29 +121,43 @@ public abstract class MembersMappingBuilderContext<T> : IMembersBuilderContext<T
 
     private IEnumerable<string> GetIgnoredObsoleteTargetMembers()
     {
-        var obsoleteStrategy = BuilderContext.Configuration.Properties.IgnoreObsoleteMembersStrategy;
+        var obsoleteStrategy = BuilderContext.Configuration.Members.IgnoreObsoleteMembersStrategy;
 
         if (!obsoleteStrategy.HasFlag(IgnoreObsoleteMembersStrategy.Target))
             return Enumerable.Empty<string>();
 
         return BuilderContext
-            .SymbolAccessor
-            .GetAllAccessibleMappableMembers(Mapping.TargetType)
+            .SymbolAccessor.GetAllAccessibleMappableMembers(Mapping.TargetType)
             .Where(x => BuilderContext.SymbolAccessor.HasAttribute<ObsoleteAttribute>(x.MemberSymbol))
             .Select(x => x.Name);
     }
 
     private IEnumerable<string> GetIgnoredObsoleteSourceMembers()
     {
-        var obsoleteStrategy = BuilderContext.Configuration.Properties.IgnoreObsoleteMembersStrategy;
+        var obsoleteStrategy = BuilderContext.Configuration.Members.IgnoreObsoleteMembersStrategy;
 
         if (!obsoleteStrategy.HasFlag(IgnoreObsoleteMembersStrategy.Source))
             return Enumerable.Empty<string>();
 
         return BuilderContext
-            .SymbolAccessor
-            .GetAllAccessibleMappableMembers(Mapping.SourceType)
+            .SymbolAccessor.GetAllAccessibleMappableMembers(Mapping.SourceType)
             .Where(x => BuilderContext.SymbolAccessor.HasAttribute<ObsoleteAttribute>(x.MemberSymbol))
+            .Select(x => x.Name);
+    }
+
+    private IEnumerable<string> GetIgnoredTargetMembers()
+    {
+        return BuilderContext
+            .SymbolAccessor.GetAllAccessibleMappableMembers(Mapping.TargetType)
+            .Where(x => BuilderContext.SymbolAccessor.HasAttribute<MapperIgnoreAttribute>(x.MemberSymbol))
+            .Select(x => x.Name);
+    }
+
+    private IEnumerable<string> GetIgnoredSourceMembers()
+    {
+        return BuilderContext
+            .SymbolAccessor.GetAllAccessibleMappableMembers(Mapping.SourceType)
+            .Where(x => BuilderContext.SymbolAccessor.HasAttribute<MapperIgnoreAttribute>(x.MemberSymbol))
             .Select(x => x.Name);
     }
 
@@ -134,18 +169,14 @@ public abstract class MembersMappingBuilderContext<T> : IMembersBuilderContext<T
     private Dictionary<string, IMappableMember> GetTargetMembers()
     {
         return BuilderContext
-            .SymbolAccessor
-            .GetAllAccessibleMappableMembers(Mapping.TargetType)
+            .SymbolAccessor.GetAllAccessibleMappableMembers(Mapping.TargetType)
             .ToDictionary(x => x.Name, StringComparer.OrdinalIgnoreCase);
     }
 
-    private Dictionary<string, List<PropertyMappingConfiguration>> GetMemberConfigurations()
+    private Dictionary<string, List<MemberMappingConfiguration>> GetMemberConfigurations()
     {
         return BuilderContext
-            .Configuration
-            .Properties
-            .ExplicitMappings
-            .GroupBy(x => x.Target.Path.First())
+            .Configuration.Members.ExplicitMappings.GroupBy(x => x.Target.Path.First())
             .ToDictionary(x => x.Key, x => x.ToList());
     }
 
@@ -153,7 +184,7 @@ public abstract class MembersMappingBuilderContext<T> : IMembersBuilderContext<T
     {
         foreach (var notFoundIgnoredMember in _ignoredUnmatchedTargetMemberNames)
         {
-            if (notFoundIgnoredMember.Contains(StringMemberPath.PropertyAccessSeparator, StringComparison.Ordinal))
+            if (notFoundIgnoredMember.Contains(StringMemberPath.MemberAccessSeparator, StringComparison.Ordinal))
             {
                 BuilderContext.ReportDiagnostic(DiagnosticDescriptors.NestedIgnoredTargetMember, notFoundIgnoredMember, Mapping.TargetType);
                 continue;
@@ -166,7 +197,7 @@ public abstract class MembersMappingBuilderContext<T> : IMembersBuilderContext<T
     {
         foreach (var notFoundIgnoredMember in _ignoredUnmatchedSourceMemberNames)
         {
-            if (notFoundIgnoredMember.Contains(StringMemberPath.PropertyAccessSeparator, StringComparison.Ordinal))
+            if (notFoundIgnoredMember.Contains(StringMemberPath.MemberAccessSeparator, StringComparison.Ordinal))
             {
                 BuilderContext.ReportDiagnostic(DiagnosticDescriptors.NestedIgnoredSourceMember, notFoundIgnoredMember, Mapping.TargetType);
                 continue;
@@ -189,7 +220,7 @@ public abstract class MembersMappingBuilderContext<T> : IMembersBuilderContext<T
 
     private void AddUnmatchedSourceMembersDiagnostics()
     {
-        if (!BuilderContext.Configuration.Properties.RequiredMappingStrategy.HasFlag(RequiredMappingStrategy.Source))
+        if (!BuilderContext.Configuration.Members.RequiredMappingStrategy.HasFlag(RequiredMappingStrategy.Source))
             return;
 
         foreach (var sourceMemberName in _unmappedSourceMemberNames)
@@ -223,6 +254,18 @@ public abstract class MembersMappingBuilderContext<T> : IMembersBuilderContext<T
                 DiagnosticDescriptors.IgnoredSourceMemberExplicitlyMapped,
                 sourceMemberName,
                 Mapping.SourceType
+            );
+        }
+    }
+
+    private void AddNoMemberMappedDiagnostic()
+    {
+        if (!_hasMemberMapping)
+        {
+            BuilderContext.ReportDiagnostic(
+                DiagnosticDescriptors.NoMemberMappings,
+                BuilderContext.Source.ToDisplayString(),
+                BuilderContext.Target.ToDisplayString()
             );
         }
     }

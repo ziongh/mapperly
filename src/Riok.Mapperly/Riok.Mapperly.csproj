@@ -16,8 +16,10 @@
     <PackageTags>Mapper SourceGenerator</PackageTags>
     <PackageIcon>logo.png</PackageIcon>
 
-    <!-- default roslyn version -->
+    <!-- default roslyn version and constants -->
     <ROSLYN_VERSION Condition="'$(ROSLYN_VERSION)' == ''">4.7</ROSLYN_VERSION>
+    <DefineConstants Condition="$(ROSLYN_VERSION) >= 4.4">$(DefineConstants);ROSLYN4_4_OR_GREATER</DefineConstants>
+    <DefineConstants Condition="$(ROSLYN_VERSION) >= 4.7">$(DefineConstants);ROSLYN4_7_OR_GREATER</DefineConstants>
   </PropertyGroup>
 
   <Target Name="Husky" BeforeTargets="Restore;CollectPackageReferences" Condition="'$(HUSKY)' != 0 AND '$(CI)' == ''">
@@ -33,7 +35,7 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.CodeAnalysis.Analyzers" Version="3.3.4" PrivateAssets="all" />
-    <PackageReference Include="Microsoft.CodeAnalysis.BannedApiAnalyzers" Version="3.3.4" PrivateAssets="all" >
+    <PackageReference Include="Microsoft.CodeAnalysis.BannedApiAnalyzers" Version="3.3.4" PrivateAssets="all">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>analyzers</IncludeAssets>
     </PackageReference>
@@ -47,13 +49,6 @@
     <Compile Remove="Helpers/DebuggerUtil.cs" />
   </ItemGroup>
 
-  <ItemGroup>
-    <EmbeddedResource Include="..\Riok.Mapperly.Templates\*.cs"
-                      CopyToOutputDirectory="Never"
-                      Visible="false"
-                      LogicalName="Templates/%(FileName)" />
-  </ItemGroup>
-
   <!--
   This ensures the library will be packaged as a source generator when we use `dotnet pack`
   -->
@@ -64,5 +59,6 @@
     <None Include="$(OutputPath)\$(AssemblyName).Abstractions.dll" Pack="true" PackagePath="analyzers/roslyn$(ROSLYN_VERSION)/dotnet/cs" Visible="false" />
     <None Include="$(OutputPath)\$(AssemblyName).Abstractions.dll" Pack="true" PackagePath="lib\netstandard2.0" Visible="true" />
     <None Include="$(OutputPath)\$(AssemblyName).Abstractions.xml" Pack="true" PackagePath="lib\netstandard2.0" Visible="true" />
+    <None Include="Riok.Mapperly.targets" Pack="true" PackagePath="build" Visible="false" />
   </ItemGroup>
 </Project>

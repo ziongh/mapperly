@@ -5,7 +5,7 @@ using Riok.Mapperly.Helpers;
 
 namespace Riok.Mapperly.Descriptors;
 
-[DebuggerDisplay("{Source.Name} => {Target.Name}")]
+[DebuggerDisplay("{Source} => {Target}")]
 public readonly struct TypeMappingKey(
     ITypeSymbol source,
     ITypeSymbol target,
@@ -18,17 +18,11 @@ public readonly struct TypeMappingKey(
     public TypeMappingKey(ITypeMapping mapping, TypeMappingConfiguration? config = null, bool includeNullability = true)
         : this(mapping.SourceType, mapping.TargetType, config, includeNullability) { }
 
-    public ITypeSymbol Source { get; } =
-        includeNullability ? NullableSymbolExtensions.UpgradeNullable(source) : NullableSymbolExtensions.NonNullable(source);
+    public ITypeSymbol Source { get; } = includeNullability ? source : source.NonNullable();
 
-    public ITypeSymbol Target { get; } =
-        includeNullability ? NullableSymbolExtensions.UpgradeNullable(target) : NullableSymbolExtensions.NonNullable(target);
+    public ITypeSymbol Target { get; } = includeNullability ? target : target.NonNullable();
 
     public TypeMappingConfiguration Configuration { get; } = config ?? TypeMappingConfiguration.Default;
-
-    public TypeMappingKey NonNullableSource() => new(Source.NonNullable(), Target, Configuration);
-
-    public TypeMappingKey NonNullableTarget() => new(Source, Target.NonNullable(), Configuration);
 
     public TypeMappingKey NonNullable() => new(Source.NonNullable(), Target.NonNullable(), Configuration);
 

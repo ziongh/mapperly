@@ -2,17 +2,23 @@ using System.Text;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Text;
 using Riok.Mapperly.Output;
-using Riok.Mapperly.Templates;
 
 namespace Riok.Mapperly.Helpers;
 
-internal static class IncrementalValuesProviderExtensions
+internal static partial class IncrementalValuesProviderExtensions
 {
     public static IncrementalValuesProvider<TSource> WhereNotNull<TSource>(this IncrementalValuesProvider<TSource?> source)
         where TSource : struct
     {
 #nullable disable
         return source.Where(x => x.HasValue).Select((x, _) => x!.Value);
+#nullable enable
+    }
+
+    public static IncrementalValuesProvider<TSource> WhereNotNull<TSource>(this IncrementalValuesProvider<TSource?> source)
+    {
+#nullable disable
+        return source.Where(x => x != null);
 #nullable enable
     }
 
@@ -70,32 +76,4 @@ internal static class IncrementalValuesProviderExtensions
             }
         );
     }
-
-    public static void EmitTemplates(
-        this IncrementalGeneratorInitializationContext context,
-        IncrementalValuesProvider<TemplateContent> templates
-    )
-    {
-        context.RegisterImplementationSourceOutput(
-            templates,
-            static (spc, template) => spc.AddSource(template.FileName, SourceText.From(template.Content, Encoding.UTF8))
-        );
-    }
-
-#if !ROSLYN4_4_OR_GREATER
-    public static IncrementalValuesProvider<TSource> WhereNotNull<TSource>(this IncrementalValuesProvider<TSource?> source)
-    {
-#nullable disable
-        return source.Where(x => x != null);
-#nullable enable
-    }
-
-    public static IncrementalValueProvider<TSource> WithTrackingName<TSource>(this IncrementalValueProvider<TSource> source, string name) =>
-        source;
-
-    public static IncrementalValuesProvider<TSource> WithTrackingName<TSource>(
-        this IncrementalValuesProvider<TSource> source,
-        string name
-    ) => source;
-#endif
 }

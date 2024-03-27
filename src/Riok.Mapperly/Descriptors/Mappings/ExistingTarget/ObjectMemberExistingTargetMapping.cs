@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using Microsoft.CodeAnalysis;
 using Riok.Mapperly.Descriptors.Mappings.MemberMappings;
 
@@ -7,6 +8,7 @@ namespace Riok.Mapperly.Descriptors.Mappings.ExistingTarget;
 /// Represents a complex object mapping implemented in its own method.
 /// Maps each property from the source to the target.
 /// </summary>
+[DebuggerDisplay("{GetType().Name}({SourceType} => {TargetType})")]
 public class ObjectMemberExistingTargetMapping(ITypeSymbol sourceType, ITypeSymbol targetType)
     : MemberAssignmentMappingContainer,
         IExistingTargetMapping,
@@ -16,9 +18,5 @@ public class ObjectMemberExistingTargetMapping(ITypeSymbol sourceType, ITypeSymb
 
     public ITypeSymbol TargetType { get; } = targetType;
 
-    public bool CallableByOtherMappings => true;
-
     public bool IsSynthetic => false;
-
-    public MappingBodyBuildingPriority BodyBuildingPriority => MappingBodyBuildingPriority.Default;
 }

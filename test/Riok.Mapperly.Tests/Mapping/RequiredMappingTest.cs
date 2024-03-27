@@ -3,7 +3,6 @@ using Riok.Mapperly.Diagnostics;
 
 namespace Riok.Mapperly.Tests.Mapping;
 
-[UsesVerify]
 public class RequiredMappingTest
 {
     [Fact]
@@ -233,7 +232,7 @@ public class RequiredMappingTest
         );
 
         TestHelper
-            .GenerateMapper(source, TestHelperOptions.AllowAllDiagnostics)
+            .GenerateMapper(source, TestHelperOptions.AllowDiagnostics)
             .Should()
             .HaveDiagnostic(DiagnosticDescriptors.NoConstructorFound)
             .HaveDiagnostic(DiagnosticDescriptors.SourceMemberNotFound)

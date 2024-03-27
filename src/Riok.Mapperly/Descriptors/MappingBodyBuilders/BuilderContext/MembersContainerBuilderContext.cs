@@ -26,9 +26,13 @@ public class MembersContainerBuilderContext<T>(MappingBuilderContext builderCont
 
         // set target member to null if null assignments are allowed
         // and the source is null
-        if (BuilderContext.MapperConfiguration.AllowNullPropertyAssignment && memberMapping.TargetPath.Member.Type.IsNullable())
+        if (BuilderContext.Configuration.Mapper.AllowNullPropertyAssignment && memberMapping.TargetPath.Member.Type.IsNullable())
         {
             container.AddNullMemberAssignment(SetterMemberPath.Build(BuilderContext, memberMapping.TargetPath));
+        }
+        else if (BuilderContext.Configuration.Mapper.ThrowOnPropertyMappingNullMismatch)
+        {
+            container.ThrowOnSourcePathNull();
         }
     }
 
@@ -49,7 +53,7 @@ public class MembersContainerBuilderContext<T>(MappingBuilderContext builderCont
             if (!nullablePath.Member.CanSet)
                 continue;
 
-            if (!BuilderContext.SymbolAccessor.HasAccessibleParameterlessConstructor(type))
+            if (!BuilderContext.SymbolAccessor.HasDirectlyAccessibleParameterlessConstructor(type))
             {
                 BuilderContext.ReportDiagnostic(DiagnosticDescriptors.NoParameterlessConstructorFound, type);
                 continue;
@@ -95,7 +99,6 @@ public class MembersContainerBuilderContext<T>(MappingBuilderContext builderCont
         mapping = new MemberNullDelegateAssignmentMapping(
             GetterMemberPath.Build(BuilderContext, nullConditionSourcePath),
             parentMapping,
-            BuilderContext.MapperConfiguration.ThrowOnPropertyMappingNullMismatch,
             needsNullSafeAccess
         );
         _nullDelegateMappings[nullConditionSourcePath] = mapping;

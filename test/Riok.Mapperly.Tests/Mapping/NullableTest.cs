@@ -1,6 +1,5 @@
 namespace Riok.Mapperly.Tests.Mapping;
 
-[UsesVerify]
 public class NullableTest
 {
     [Fact]
@@ -202,30 +201,36 @@ public class NullableTest
     [Fact]
     public Task ShouldUpgradeNullabilityInDisabledNullableContext()
     {
-        var source = TestSourceBuilder.Mapping("A", "B", "class A {}", "class B {}");
+        var source = TestSourceBuilder.Mapping(
+            "A",
+            "B",
+            "class A { public int Value { get; set; } }",
+            "class B { public int Value { get; set; } }"
+        );
         return TestHelper.VerifyGenerator(source, TestHelperOptions.DisabledNullable);
     }
 
     [Fact]
-    public void NullableDirectiveEnabledTargetWithSameNullableRefTypeAsPropertyAndInEnumerable()
+    public Task ShouldUpgradeArrayElementNullabilityInDisabledNullableContext()
     {
         var source = TestSourceBuilder.Mapping(
-            "A",
-            "B",
-            "class A { public string Value { get; set; } public string[] Descriptions { get; set; } }",
-            "#nullable disable\n class B { public string Value { get; set; } public string[] Descriptions { get; set; } }\n#nullable enable"
+            "A[]",
+            "B[]",
+            "class A { public int Value { get; set; } }",
+            "class B { public int Value { get; set; } }"
         );
+        return TestHelper.VerifyGenerator(source, TestHelperOptions.DisabledNullable);
+    }
 
-        TestHelper
-            .GenerateMapper(source)
-            .Should()
-            .HaveMapMethodBody(
-                """
-                var target = new global::B();
-                target.Value = source.Value;
-                target.Descriptions = (string[])source.Descriptions;
-                return target;
-                """
-            );
+    [Fact]
+    public Task ShouldUpgradeGenericNullabilityInDisabledNullableContext()
+    {
+        var source = TestSourceBuilder.Mapping(
+            "IEnumerable<A>",
+            "IReadOnlyCollection<B>",
+            "class A { public int Value { get; set; } }",
+            "class B { public int Value { get; set; } }"
+        );
+        return TestHelper.VerifyGenerator(source, TestHelperOptions.DisabledNullable);
     }
 }

@@ -1,3 +1,4 @@
+using Microsoft.CodeAnalysis;
 using Riok.Mapperly.Descriptors.MappingBuilders;
 using Riok.Mapperly.Descriptors.Mappings;
 using Riok.Mapperly.Descriptors.Mappings.UserMappings;
@@ -14,15 +15,26 @@ public static class RuntimeTargetTypeMappingBodyBuilder
         // therefore set source type always to nun-nullable
         // as non-nullables are also assignable to nullables.
         var mappings = GetUserMappingCandidates(ctx)
-            .Where(
-                x =>
-                    mapping
-                        .TypeParameters
-                        .DoesTypesSatisfyTypeParameterConstraints(ctx.SymbolAccessor, x.SourceType.NonNullable(), x.TargetType)
+            .Where(x =>
+                DoesTypesSatisfySubstitutionPrinciples(mapping, ctx.SymbolAccessor, x.SourceType.NonNullable(), x.TargetType)
+                && mapping.TypeParameters.DoesTypesSatisfyTypeParameterConstraints(
+                    ctx.SymbolAccessor,
+                    x.SourceType.NonNullable(),
+                    x.TargetType
+                )
             );
 
         BuildMappingBody(ctx, mapping, mappings);
     }
+
+    private static bool DoesTypesSatisfySubstitutionPrinciples(
+        IMapping mapping,
+        SymbolAccessor symbolAccessor,
+        ITypeSymbol sourceType,
+        ITypeSymbol targetType
+    ) =>
+        (mapping.SourceType.TypeKind == TypeKind.TypeParameter || symbolAccessor.HasImplicitConversion(sourceType, mapping.SourceType))
+        && (mapping.TargetType.TypeKind == TypeKind.TypeParameter || symbolAccessor.HasImplicitConversion(targetType, mapping.TargetType));
 
     public static void BuildMappingBody(MappingBuilderContext ctx, UserDefinedNewInstanceRuntimeTargetTypeMapping mapping)
     {
@@ -30,30 +42,16 @@ public static class RuntimeTargetTypeMappingBodyBuilder
         // therefore set source type always to nun-nullable
         // as non-nullables are also assignable to nullables.
         var mappings = GetUserMappingCandidates(ctx)
-            .Where(
-                x =>
-                    ctx.SymbolAccessor.HasImplicitConversion(x.SourceType.NonNullable(), mapping.SourceType)
-                    && ctx.SymbolAccessor.HasImplicitConversion(x.TargetType, mapping.TargetType)
+            .Where(x =>
+                ctx.SymbolAccessor.HasImplicitConversion(x.SourceType.NonNullable(), mapping.SourceType)
+                && ctx.SymbolAccessor.HasImplicitConversion(x.TargetType, mapping.TargetType)
             );
 
         BuildMappingBody(ctx, mapping, mappings);
     }
 
-    private static IEnumerable<ITypeMapping> GetUserMappingCandidates(MappingBuilderContext ctx)
-    {
-        foreach (var userMapping in ctx.UserMappings)
-        {
-            // exclude runtime target type
-            if (userMapping is UserDefinedNewInstanceRuntimeTargetTypeMapping)
-                continue;
-
-            if (userMapping.CallableByOtherMappings)
-                yield return userMapping;
-
-            if (userMapping is IDelegateUserMapping { DelegateMapping.CallableByOtherMappings: true } delegateUserMapping)
-                yield return delegateUserMapping.DelegateMapping;
-        }
-    }
+    private static IEnumerable<ITypeMapping> GetUserMappingCandidates(MappingBuilderContext ctx) =>
+        ctx.UserMappings.Where(x => x is not UserDefinedNewInstanceRuntimeTargetTypeMapping);
 
     private static void BuildMappingBody(
         MappingBuilderContext ctx,

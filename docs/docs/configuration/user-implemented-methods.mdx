@@ -6,7 +6,7 @@ description: Manually implement mappings
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-# User implemented mapping methods
+# User-implemented mapping methods
 
 If Mapperly cannot generate a mapping, one can implement it manually simply by providing a method body in the mapper declaration:
 
@@ -21,6 +21,82 @@ public partial class CarMapper
 ```
 
 Whenever Mapperly needs a mapping from `TimeSpan` to `int` inside the `CarMapper` implementation, it will use the provided implementation.
+The types of the user-implemented mapping method need to match the types to map exactly, including nullability.
+
+If there are multiple user-implemented mapping methods suiting the given type-pair, by default, the first one is used.
+This can be customized by using [automatic user-implemented mapping method discovery](#automatic-user-implemented-mapping-method-discovery)
+and [default user-implemented mapping method](#default-user-implemented-mapping-method).
+
+## Automatic user-implemented mapping method discovery
+
+By default, user implemented mapping methods are discovered automatically.
+This can be disabled by setting `AutoUserMappings` to `false`.
+With `AutoUserMappings` disabled, only methods marked by the `UserMappingAttribute` are discovered by Mapperly.
+
+```csharp
+// highlight-start
+[Mapper(AutoUserMappings = false)]
+// highlight-end
+public partial class CarMapper
+{
+    public partial CarDto CarToCarDto(Car car);
+
+    // highlight-start
+    // mark as user-implemented mapping
+    [UserMapping]
+    // highlight-end
+    private int TimeSpanToHours(TimeSpan t) => t.Hours;
+
+    private int IgnoredTimeSpanToHours(TimeSpan t) => t.Minutes / 60;
+}
+```
+
+The `AutoUserMappings` value also applies to the usage of external mappers:
+With `AutoUserMappings` enabled all methods with a mapping method signature are discovered.
+With `AutoUserMappings` disabled, only methods with a `UserMappingAttribute` and,
+if the containing class has a `MapperAttribute`, partial methods are discovered.
+
+## Ignoring a user-implemented mapping method
+
+To ignore a user-implemented mapping method with enabled `AutoUserMappings`,
+`[UserMapping(Ignore = true)]` can be applied.
+
+```csharp
+[Mapper]
+public partial class CarMapper
+{
+    public partial CarDto CarToCarDto(Car car);
+
+    // highlight-start
+    // discovered and used by default (AutoUserMappings is true by default)
+    // highlight-end
+    private int TimeSpanToHours(TimeSpan t) => t.Hours;
+
+    // highlight-start
+    // ignored user-implemented mapping
+    [UserMapping(Ignore = true)]
+    // highlight-end
+    private int IgnoredTimeSpanToHours(TimeSpan t) => t.Minutes / 60;
+}
+```
+
+## Default user-implemented mapping method
+
+Whenever Mapperly will need a mapping for a given type-pair,
+it will use the default user-implemented mapping.
+A user-implemented mapping is considered the default mapping for a type-pair
+if `Default = true` is set on the `UserMapping` attribute.
+If no user-implemented mapping with `Default = true` exists and `AutoUserMappings` is enabled,
+the first user-implemented mapping which has an unspecified `Default` value is used.
+For each type-pair only one default mapping can exist.
+
+If multiple mappings exist for the same type-pair without a default mapping, `RMG060` is reported.
+By default `RMG060` has a severity of warning,
+which can be changed using the [`.editorconfig`](./analyzer-diagnostics/index.mdx#editorconfig).
+
+## Map properties using user-implemented mappings
+
+See [user-implemented property conversions](./mapper.mdx#user-implemented-property-mappings).
 
 ## Use external mappings
 
@@ -83,4 +159,5 @@ In order for Mapperly to find the mappings, they must be made known with `UseMap
 Whenever Mapperly needs a mapping from `BananaBox` to `BananaBoxDto` inside the `BoxMapper` implementation,
 it will use the provided implementation by the `BananaMapper`.
 
-Used mappers themselves can be Mapperly backed classes.
+Used mappers themselves can be Mapperly backed classes.  
+The [`AutoUserMappings`](#automatic-user-implemented-mapping-method-discovery) value also applies to the usage of external mappers.

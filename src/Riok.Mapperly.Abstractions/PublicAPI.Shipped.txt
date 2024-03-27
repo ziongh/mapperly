@@ -42,6 +42,8 @@ Riok.Mapperly.Abstractions.MapperConstructorAttribute.MapperConstructorAttribute
 Riok.Mapperly.Abstractions.MapperIgnoreObsoleteMembersAttribute
 Riok.Mapperly.Abstractions.MapperIgnoreObsoleteMembersAttribute.IgnoreObsoleteStrategy.get -> Riok.Mapperly.Abstractions.IgnoreObsoleteMembersStrategy
 Riok.Mapperly.Abstractions.MapperIgnoreObsoleteMembersAttribute.MapperIgnoreObsoleteMembersAttribute(Riok.Mapperly.Abstractions.IgnoreObsoleteMembersStrategy ignoreObsoleteStrategy = (Riok.Mapperly.Abstractions.IgnoreObsoleteMembersStrategy)-1) -> void
+Riok.Mapperly.Abstractions.MapperIgnoreAttribute
+Riok.Mapperly.Abstractions.MapperIgnoreAttribute.MapperIgnoreAttribute() -> void
 Riok.Mapperly.Abstractions.MapperIgnoreSourceAttribute
 Riok.Mapperly.Abstractions.MapperIgnoreSourceAttribute.MapperIgnoreSourceAttribute(string! source) -> void
 Riok.Mapperly.Abstractions.MapperIgnoreSourceAttribute.Source.get -> string!
@@ -137,3 +139,19 @@ Riok.Mapperly.Abstractions.FormatProviderAttribute.Default.set -> void
 Riok.Mapperly.Abstractions.FormatProviderAttribute.FormatProviderAttribute() -> void
 Riok.Mapperly.Abstractions.MapPropertyAttribute.FormatProvider.get -> string?
 Riok.Mapperly.Abstractions.MapPropertyAttribute.FormatProvider.set -> void
+Riok.Mapperly.Abstractions.ReferenceHandling.PreserveReferenceHandler
+Riok.Mapperly.Abstractions.ReferenceHandling.PreserveReferenceHandler.PreserveReferenceHandler() -> void
+Riok.Mapperly.Abstractions.ReferenceHandling.PreserveReferenceHandler.SetReference<TSource, TTarget>(TSource source, TTarget target) -> void
+Riok.Mapperly.Abstractions.ReferenceHandling.PreserveReferenceHandler.TryGetReference<TSource, TTarget>(TSource source, out TTarget? target) -> bool
+Riok.Mapperly.Abstractions.MapperAttribute.PreferParameterlessConstructors.get -> bool
+Riok.Mapperly.Abstractions.MapperAttribute.PreferParameterlessConstructors.set -> void
+Riok.Mapperly.Abstractions.MapperAttribute.AutoUserMappings.get -> bool
+Riok.Mapperly.Abstractions.MapperAttribute.AutoUserMappings.set -> void
+Riok.Mapperly.Abstractions.UserMappingAttribute
+Riok.Mapperly.Abstractions.UserMappingAttribute.Ignore.get -> bool
+Riok.Mapperly.Abstractions.UserMappingAttribute.Ignore.set -> void
+Riok.Mapperly.Abstractions.UserMappingAttribute.UserMappingAttribute() -> void
+Riok.Mapperly.Abstractions.UserMappingAttribute.Default.get -> bool
+Riok.Mapperly.Abstractions.UserMappingAttribute.Default.set -> void
+Riok.Mapperly.Abstractions.MapPropertyAttribute.Use.get -> string?
+Riok.Mapperly.Abstractions.MapPropertyAttribute.Use.set -> void

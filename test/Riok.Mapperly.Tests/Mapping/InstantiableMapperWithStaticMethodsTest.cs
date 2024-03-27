@@ -2,7 +2,6 @@ using Riok.Mapperly.Diagnostics;
 
 namespace Riok.Mapperly.Tests.Mapping;
 
-[UsesVerify]
 public class InstantiableMapperWithStaticMethodsTest
 {
     [Fact]
@@ -164,8 +163,8 @@ public class InstantiableMapperWithStaticMethodsTest
 
             record A(AExternal Value);
             record B(BExternal Value);
-            record AExternal();
-            record BExternal();
+            record AExternal(int ExternalValue);
+            record BExternal(int ExternalValue);
 
             class OtherMapper {
                 public BExternal ToBExternal(AExternal source) => new BExternal();
@@ -186,25 +185,17 @@ public class InstantiableMapperWithStaticMethodsTest
     [Fact]
     public void MixedStaticMethodWithPartialInstanceMethod()
     {
-        var source = TestSourceBuilder.CSharp(
+        var source = TestSourceBuilder.MapperWithBodyAndTypes(
             """
-            using Riok.Mapperly.Abstractions;
-
-            record A(int Value);
-            record B(int Value);
-
-            [Mapper]
-            public partial class Mapper
-            {
-                static partial B Map(A source);
-
-                partial B Map2(A source);
-            }
-            """
+            static partial B Map(A source);
+            partial string Map2(int source);
+            """,
+            "record A(int Value);",
+            "record B(int Value);"
         );
 
         TestHelper
-            .GenerateMapper(source, TestHelperOptions.AllowAllDiagnostics)
+            .GenerateMapper(source, TestHelperOptions.AllowDiagnostics)
             .Should()
             .HaveDiagnostic(DiagnosticDescriptors.MixingStaticPartialWithInstanceMethod)
             .HaveAssertedAllDiagnostics();
@@ -232,7 +223,7 @@ public class InstantiableMapperWithStaticMethodsTest
         );
 
         TestHelper
-            .GenerateMapper(source, TestHelperOptions.AllowAllDiagnostics)
+            .GenerateMapper(source, TestHelperOptions.AllowDiagnostics)
             .Should()
             .HaveDiagnostic(DiagnosticDescriptors.InvalidObjectFactorySignature)
             .HaveAssertedAllDiagnostics();
@@ -241,27 +232,22 @@ public class InstantiableMapperWithStaticMethodsTest
     [Fact]
     public void MixedStaticMethodWithInstanceMethod()
     {
-        var source = TestSourceBuilder.CSharp(
+        var source = TestSourceBuilder.MapperWithBodyAndTypes(
             """
-            using Riok.Mapperly.Abstractions;
-
-            record A(int Value);
-            record B(int Value);
-
-            [Mapper]
-            public partial class Mapper
-            {
-                static partial B Map(A source);
-
-                private B Map2(A source);
-            }
-            """
+            static partial B Map(A source);
+            private string Map2(int source);
+            """,
+            "record A(int Value);",
+            "record B(int Value);"
         );
 
         TestHelper
-            .GenerateMapper(source, TestHelperOptions.AllowAllDiagnostics)
+            .GenerateMapper(source, TestHelperOptions.AllowDiagnostics)
             .Should()
-            .HaveDiagnostic(DiagnosticDescriptors.MixingStaticPartialWithInstanceMethod)
+            .HaveDiagnostic(
+                DiagnosticDescriptors.MixingStaticPartialWithInstanceMethod,
+                "Mapper class Mapper contains 'static partial' methods. Use either only instance methods or only static methods."
+            )
             .HaveAssertedAllDiagnostics();
     }
 }

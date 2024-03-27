@@ -1,9 +1,9 @@
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
+using Riok.Mapperly.Abstractions.ReferenceHandling;
 using Riok.Mapperly.Descriptors.Mappings.ExistingTarget;
 using Riok.Mapperly.Helpers;
 using Riok.Mapperly.Symbols;
-using Riok.Mapperly.Templates;
 using static Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
 using static Riok.Mapperly.Emit.Syntax.SyntaxFactoryHelper;
 
@@ -18,20 +18,40 @@ public class UserDefinedExistingTargetMethodMapping(
     MethodParameter targetParameter,
     MethodParameter? referenceHandlerParameter,
     bool enableReferenceHandling
-) : MethodMapping(method, sourceParameter, referenceHandlerParameter, targetParameter.Type), IUserMapping
+) : MethodMapping(method, sourceParameter, referenceHandlerParameter, targetParameter.Type), IExistingTargetUserMapping
 {
     private IExistingTargetMapping? _delegateMapping;
 
     public IMethodSymbol Method { get; } = method;
 
-    public void SetDelegateMapping(IExistingTargetMapping delegateMapping) => _delegateMapping = delegateMapping;
+    public bool? Default => false;
+
+    public bool IsExternal => false;
 
     private MethodParameter TargetParameter { get; } = targetParameter;
 
-    public override bool CallableByOtherMappings => false;
+    /// <summary>
+    /// The reference handling is enabled but is only internal to this method.
+    /// No reference handler parameter is passed.
+    /// </summary>
+    private bool InternalReferenceHandlingEnabled => enableReferenceHandling && ReferenceHandlerParameter == null;
+
+    public void SetDelegateMapping(IExistingTargetMapping delegateMapping) => _delegateMapping = delegateMapping;
 
     public override ExpressionSyntax Build(TypeMappingBuildContext ctx) =>
         throw new InvalidOperationException($"{nameof(UserDefinedExistingTargetMethodMapping)} does not support {nameof(Build)}");
+
+    public IEnumerable<StatementSyntax> Build(TypeMappingBuildContext ctx, ExpressionSyntax target)
+    {
+        return ctx.SyntaxFactory.SingleStatement(
+            Invocation(
+                MethodName,
+                SourceParameter.WithArgument(ctx.Source),
+                TargetParameter.WithArgument(target),
+                ReferenceHandlerParameter?.WithArgument(ctx.ReferenceHandler)
+            )
+        );
+    }
 
     public override IEnumerable<StatementSyntax> BuildBody(TypeMappingBuildContext ctx)
     {
@@ -51,11 +71,11 @@ public class UserDefinedExistingTargetMethodMapping(
 
         // if reference handling is enabled and no reference handler parameter is declared
         // a new reference handler is instantiated and used.
-        if (enableReferenceHandling && ReferenceHandlerParameter == null)
+        if (InternalReferenceHandlingEnabled)
         {
             // var refHandler = new RefHandler();
             var referenceHandlerName = ctx.NameBuilder.New(DefaultReferenceHandlerParameterName);
-            var createRefHandler = ctx.SyntaxFactory.CreateInstance(TemplateReference.PreserveReferenceHandler);
+            var createRefHandler = ctx.SyntaxFactory.CreateInstance<PreserveReferenceHandler>();
             yield return ctx.SyntaxFactory.DeclareLocalVariable(referenceHandlerName, createRefHandler);
             ctx = ctx.WithRefHandler(referenceHandlerName);
         }

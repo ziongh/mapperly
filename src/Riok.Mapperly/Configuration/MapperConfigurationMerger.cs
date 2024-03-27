@@ -54,6 +54,14 @@ public static class MapperConfigurationMerger
         mapper.IncludedMembers =
             mapperConfiguration.IncludedMembers ?? defaultMapperConfiguration.IncludedMembers ?? mapper.IncludedMembers;
 
+        mapper.PreferParameterlessConstructors =
+            mapperConfiguration.PreferParameterlessConstructors
+            ?? defaultMapperConfiguration.PreferParameterlessConstructors
+            ?? mapper.PreferParameterlessConstructors;
+
+        mapper.AutoUserMappings =
+            mapperConfiguration.AutoUserMappings ?? defaultMapperConfiguration.AutoUserMappings ?? mapper.AutoUserMappings;
+
         return mapper;
     }
 }

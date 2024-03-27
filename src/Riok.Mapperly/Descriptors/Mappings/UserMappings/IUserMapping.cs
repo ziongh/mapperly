@@ -1,4 +1,5 @@
 using Microsoft.CodeAnalysis;
+using Riok.Mapperly.Abstractions;
 
 namespace Riok.Mapperly.Descriptors.Mappings.UserMappings;
 
@@ -8,4 +9,13 @@ namespace Riok.Mapperly.Descriptors.Mappings.UserMappings;
 public interface IUserMapping : ITypeMapping
 {
     IMethodSymbol Method { get; }
+
+    /// <inheritdoc cref="UserMappingAttribute.Default"/>
+    bool? Default { get; }
+
+    /// <summary>
+    /// An external mapping is defined in another class.
+    /// E.g. base class or imported via <see cref="UseStaticMapperAttribute{T}"/>
+    /// </summary>
+    bool IsExternal { get; }
 }

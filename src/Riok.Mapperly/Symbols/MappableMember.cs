@@ -7,13 +7,13 @@ internal static class MappableMember
 {
     public static IMappableMember? Create(SymbolAccessor accessor, ISymbol symbol)
     {
-        if (!accessor.IsAccessibleToMemberVisibility(symbol))
+        if (!accessor.IsAccessible(symbol))
             return null;
 
         return symbol switch
         {
             IPropertySymbol property => new PropertyMember(property, accessor),
-            IFieldSymbol field => new FieldMember(field),
+            IFieldSymbol field => new FieldMember(field, accessor),
             _ => null,
         };
     }

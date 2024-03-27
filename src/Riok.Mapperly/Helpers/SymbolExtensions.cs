@@ -6,9 +6,10 @@ namespace Riok.Mapperly.Helpers;
 
 internal static class SymbolExtensions
 {
-    private static readonly SymbolDisplayFormat _fullyQualifiedNullableFormat = SymbolDisplayFormat
-        .FullyQualifiedFormat
-        .AddMiscellaneousOptions(SymbolDisplayMiscellaneousOptions.IncludeNullableReferenceTypeModifier);
+    private static readonly SymbolDisplayFormat _fullyQualifiedNullableFormat =
+        SymbolDisplayFormat.FullyQualifiedFormat.AddMiscellaneousOptions(
+            SymbolDisplayMiscellaneousOptions.IncludeNullableReferenceTypeModifier
+        );
 
     private static readonly ImmutableHashSet<string> _wellKnownImmutableTypes = ImmutableHashSet.Create(
         typeof(Uri).FullName!,
@@ -21,13 +22,24 @@ internal static class SymbolExtensions
     internal static string FullyQualifiedIdentifierName(this ITypeSymbol typeSymbol) =>
         typeSymbol.ToDisplayString(_fullyQualifiedNullableFormat);
 
-    internal static bool IsImmutable(this ISymbol symbol) =>
-        symbol is INamedTypeSymbol namedSymbol
-        && (
-            namedSymbol.IsUnmanagedType
+    internal static bool IsImmutable(this ISymbol symbol)
+    {
+        if (symbol is not INamedTypeSymbol namedSymbol)
+            return false;
+
+        return namedSymbol.IsUnmanagedType
             || namedSymbol.SpecialType == SpecialType.System_String
-            || _wellKnownImmutableTypes.Contains(namedSymbol.ToDisplayString())
-        );
+            || IsDelegate(symbol)
+            || _wellKnownImmutableTypes.Contains(namedSymbol.ToDisplayString());
+    }
+
+    internal static bool IsDelegate(this ISymbol symbol)
+    {
+        if (symbol is not INamedTypeSymbol namedSymbol)
+            return false;
+
+        return namedSymbol.DelegateInvokeMethod != null;
+    }
 
     internal static int GetInheritanceLevel(this ITypeSymbol symbol)
     {
@@ -42,6 +54,12 @@ internal static class SymbolExtensions
     }
 
     internal static bool IsArrayType(this ITypeSymbol symbol) => symbol is IArrayTypeSymbol;
+
+    internal static bool IsArrayType(this ITypeSymbol symbol, [NotNullWhen(true)] out IArrayTypeSymbol? arrayTypeSymbol)
+    {
+        arrayTypeSymbol = symbol as IArrayTypeSymbol;
+        return arrayTypeSymbol != null;
+    }
 
     internal static bool IsEnum(this ITypeSymbol t) => TryGetEnumUnderlyingType(t, out _);
 
@@ -104,8 +122,8 @@ internal static class SymbolExtensions
             return true;
         }
 
-        typedInterface = t.AllInterfaces.FirstOrDefault(
-            x => x.IsGenericType && SymbolEqualityComparer.Default.Equals(x.OriginalDefinition, genericInterfaceSymbol)
+        typedInterface = t.AllInterfaces.FirstOrDefault(x =>
+            x.IsGenericType && SymbolEqualityComparer.Default.Equals(x.OriginalDefinition, genericInterfaceSymbol)
         );
 
         if (typedInterface == null)

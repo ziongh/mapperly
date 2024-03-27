@@ -1,8 +1,7 @@
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
-using Riok.Mapperly.Helpers;
+using Riok.Mapperly.Abstractions.ReferenceHandling;
 using Riok.Mapperly.Symbols;
-using Riok.Mapperly.Templates;
 
 namespace Riok.Mapperly.Descriptors.Mappings.UserMappings;
 
@@ -11,31 +10,47 @@ namespace Riok.Mapperly.Descriptors.Mappings.UserMappings;
 /// </summary>
 public class UserDefinedNewInstanceMethodMapping(
     IMethodSymbol method,
+    bool? isDefault,
     MethodParameter sourceParameter,
     MethodParameter? referenceHandlerParameter,
+    ITypeSymbol targetType,
     bool enableReferenceHandling
-) : MethodMapping(method, sourceParameter, referenceHandlerParameter, method.ReturnType.UpgradeNullable()), IDelegateUserMapping
+) : NewInstanceMethodMapping(method, sourceParameter, referenceHandlerParameter, targetType), INewInstanceUserMapping
 {
     public IMethodSymbol Method { get; } = method;
 
+    public bool? Default { get; } = isDefault;
+
+    public bool IsExternal => false;
+
     public INewInstanceMapping? DelegateMapping { get; private set; }
 
+    /// <summary>
+    /// The reference handling is enabled but is only internal to this method.
+    /// No reference handler parameter is passed.
+    /// </summary>
+    public bool InternalReferenceHandlingEnabled => enableReferenceHandling && ReferenceHandlerParameter == null;
+
     public void SetDelegateMapping(INewInstanceMapping mapping) => DelegateMapping = mapping;
+
+    public override ExpressionSyntax Build(TypeMappingBuildContext ctx)
+    {
+        return InternalReferenceHandlingEnabled ? DelegateMapping?.Build(ctx) ?? base.Build(ctx) : base.Build(ctx);
+    }
 
     public override IEnumerable<StatementSyntax> BuildBody(TypeMappingBuildContext ctx)
     {
         if (DelegateMapping == null)
         {
-            return new[] { ctx.SyntaxFactory.ExpressionStatement(ctx.SyntaxFactory.ThrowMappingNotImplementedExceptionStatement()), };
+            return new[] { ctx.SyntaxFactory.ExpressionStatement(ctx.SyntaxFactory.ThrowMappingNotImplementedExceptionStatement()) };
         }
 
-        // if reference handling is enabled and no reference handler parameter is declared
         // the generated mapping method is called with a new reference handler instance
         // otherwise the generated method is embedded
-        if (enableReferenceHandling && ReferenceHandlerParameter == null)
+        if (InternalReferenceHandlingEnabled)
         {
             // new RefHandler();
-            var createRefHandler = ctx.SyntaxFactory.CreateInstance(TemplateReference.PreserveReferenceHandler);
+            var createRefHandler = ctx.SyntaxFactory.CreateInstance<PreserveReferenceHandler>();
             ctx = ctx.WithRefHandler(createRefHandler);
             return new[] { ctx.SyntaxFactory.Return(DelegateMapping.Build(ctx)) };
         }
@@ -45,12 +60,6 @@ public class UserDefinedNewInstanceMethodMapping(
 
         return new[] { ctx.SyntaxFactory.Return(DelegateMapping.Build(ctx)) };
     }
-
-    /// <summary>
-    /// A <see cref="UserDefinedNewInstanceMethodMapping"/> is callable by other mappings
-    /// if either reference handling is not activated, or the user defined a reference handler parameter.
-    /// </summary>
-    public override bool CallableByOtherMappings => !enableReferenceHandling || ReferenceHandlerParameter != null;
 
     internal override void EnableReferenceHandling(INamedTypeSymbol iReferenceHandlerType)
     {

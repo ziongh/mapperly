@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -13,7 +14,8 @@ namespace Riok.Mapperly.Descriptors.Mappings;
 /// <summary>
 /// Represents a mapping which is not a single expression but an entire method.
 /// </summary>
-public abstract class MethodMapping : NewInstanceMapping
+[DebuggerDisplay("{GetType().Name}({SourceType} => {TargetType})")]
+public abstract class MethodMapping : ITypeMapping
 {
     protected const string DefaultReferenceHandlerParameterName = "refHandler";
     private const string DefaultSourceParameterName = "source";
@@ -35,8 +37,8 @@ public abstract class MethodMapping : NewInstanceMapping
     private string? _methodName;
 
     protected MethodMapping(ITypeSymbol sourceType, ITypeSymbol targetType)
-        : base(sourceType, targetType)
     {
+        TargetType = targetType;
         SourceParameter = new MethodParameter(SourceParameterIndex, DefaultSourceParameterName, sourceType);
         _returnType = targetType;
     }
@@ -47,25 +49,31 @@ public abstract class MethodMapping : NewInstanceMapping
         MethodParameter? referenceHandlerParameter,
         ITypeSymbol targetType
     )
-        : base(sourceParameter.Type, targetType)
     {
+        TargetType = targetType;
         SourceParameter = sourceParameter;
         IsExtensionMethod = method.IsExtensionMethod;
         ReferenceHandlerParameter = referenceHandlerParameter;
         _partialMethodDefinition = method;
         _methodName = method.Name;
-        _returnType = method.ReturnType.UpgradeNullable();
+        _returnType = method.ReturnsVoid ? method.ReturnType : targetType;
     }
 
     protected bool IsExtensionMethod { get; }
 
-    private string MethodName => _methodName ?? throw new InvalidOperationException();
+    protected string MethodName => _methodName ?? throw new InvalidOperationException();
 
     protected MethodParameter SourceParameter { get; }
 
     protected MethodParameter? ReferenceHandlerParameter { get; private set; }
 
-    public override ExpressionSyntax Build(TypeMappingBuildContext ctx) =>
+    public ITypeSymbol SourceType => SourceParameter.Type;
+
+    public ITypeSymbol TargetType { get; }
+
+    public bool IsSynthetic => false;
+
+    public virtual ExpressionSyntax Build(TypeMappingBuildContext ctx) =>
         Invocation(MethodName, SourceParameter.WithArgument(ctx.Source), ReferenceHandlerParameter?.WithArgument(ctx.ReferenceHandler));
 
     public virtual MethodDeclarationSyntax BuildMethod(SourceEmitterContext ctx)
@@ -84,6 +92,7 @@ public abstract class MethodMapping : NewInstanceMapping
         return MethodDeclaration(returnType.AddTrailingSpace(), Identifier(MethodName))
             .WithModifiers(TokenList(BuildModifiers(ctx.IsStatic)))
             .WithParameterList(parameters)
+            .WithAttributeLists(ctx.SyntaxFactory.GeneratedCodeAttributeList())
             .WithBody(ctx.SyntaxFactory.Block(BuildBody(typeMappingBuildContext)));
     }
 
@@ -93,8 +102,6 @@ public abstract class MethodMapping : NewInstanceMapping
     {
         _methodName ??= methodNameBuilder(this);
     }
-
-    public bool HasReferenceHandlingParameter() => ReferenceHandlerParameter.HasValue;
 
     internal virtual void EnableReferenceHandling(INamedTypeSymbol iReferenceHandlerType)
     {

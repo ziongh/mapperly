@@ -1,6 +1,5 @@
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
-using Riok.Mapperly.Helpers;
 using Riok.Mapperly.Symbols;
 using static Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
 using static Riok.Mapperly.Emit.Syntax.SyntaxFactoryHelper;
@@ -13,11 +12,17 @@ namespace Riok.Mapperly.Descriptors.Mappings.UserMappings;
 public class UserImplementedMethodMapping(
     string? receiver,
     IMethodSymbol method,
+    bool? isDefault,
     MethodParameter sourceParameter,
-    MethodParameter? referenceHandlerParameter
-) : NewInstanceMapping(method.Parameters[0].Type.UpgradeNullable(), method.ReturnType.UpgradeNullable()), IUserMapping
+    ITypeSymbol targetType,
+    MethodParameter? referenceHandlerParameter,
+    bool isExternal
+) : NewInstanceMapping(sourceParameter.Type, targetType), INewInstanceUserMapping
 {
     public IMethodSymbol Method { get; } = method;
+
+    public bool? Default { get; } = isDefault;
+    public bool IsExternal { get; } = isExternal;
 
     public override ExpressionSyntax Build(TypeMappingBuildContext ctx)
     {
@@ -34,7 +39,11 @@ public class UserImplementedMethodMapping(
             FullyQualifiedIdentifier(Method.ReceiverType!),
             receiver == null ? ThisExpression() : IdentifierName(receiver)
         );
-        var method = MemberAccess(ParenthesizedExpression(castedReceiver), Method.Name);
-        return Invocation(method, sourceParameter.WithArgument(ctx.Source), referenceHandlerParameter?.WithArgument(ctx.ReferenceHandler));
+        var methodExpr = MemberAccess(ParenthesizedExpression(castedReceiver), Method.Name);
+        return Invocation(
+            methodExpr,
+            sourceParameter.WithArgument(ctx.Source),
+            referenceHandlerParameter?.WithArgument(ctx.ReferenceHandler)
+        );
     }
 }
