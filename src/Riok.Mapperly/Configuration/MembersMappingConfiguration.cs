@@ -8,5 +8,6 @@ public record MembersMappingConfiguration(
     IReadOnlyCollection<MemberMappingConfiguration> ExplicitMappings,
     IReadOnlyCollection<NestedMembersMappingConfiguration> NestedMappings,
     IgnoreObsoleteMembersStrategy IgnoreObsoleteMembersStrategy,
-    RequiredMappingStrategy RequiredMappingStrategy
+    RequiredMappingStrategy RequiredMappingStrategy,
+    bool MapOnlyPrimitives
 );

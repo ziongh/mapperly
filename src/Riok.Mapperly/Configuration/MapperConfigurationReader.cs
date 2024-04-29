@@ -58,7 +58,13 @@ public class MapperConfigurationReader
         var enumConfig = BuildEnumConfig(reference, diagnostics);
         var membersConfig = BuildMembersConfig(reference, diagnostics);
         var derivedTypesConfig = BuildDerivedTypeConfigs(reference.Method);
-        return new MappingConfiguration(MapperConfiguration.Mapper, enumConfig, membersConfig, derivedTypesConfig);
+        return new MappingConfiguration(
+            MapperConfiguration.Mapper,
+            enumConfig,
+            membersConfig,
+            derivedTypesConfig,
+            MapperConfiguration.MapOnlyPrimitives
+        );
     }
 
     private IReadOnlyCollection<DerivedTypeMappingConfiguration> BuildDerivedTypeConfigs(IMethodSymbol method)

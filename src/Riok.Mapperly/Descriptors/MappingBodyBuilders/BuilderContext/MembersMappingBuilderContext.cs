@@ -183,7 +183,7 @@ public abstract class MembersMappingBuilderContext<T> : IMembersBuilderContext<T
 
     private IEnumerable<string> GetComplexTypes()
     {
-        var mapOnlyPrimitives = BuilderContext.Configuration.Properties.MapOnlyPrimitives;
+        var mapOnlyPrimitives = BuilderContext.Configuration.MapOnlyPrimitives;
 
         if (!mapOnlyPrimitives)
             return Enumerable.Empty<string>();
