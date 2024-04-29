@@ -15,7 +15,7 @@
     </PackageDescription>
     <PackageTags>Mapper SourceGenerator</PackageTags>
     <PackageIcon>logo.png</PackageIcon>
-    <Version>0.0.4</Version>
+    <Version>0.0.6</Version>
     <GeneratePackageOnBuild>True</GeneratePackageOnBuild>
 
     <!-- default roslyn version and constants -->
