@@ -61,7 +61,7 @@ public class MappingBuilderContext : SimpleMappingBuilderContext
 
     public DictionaryInfos? DictionaryInfos => _dictionaryInfos ??= DictionaryInfoBuilder.Build(Types, CollectionInfos);
 
-    protected IMethodSymbol? UserSymbol { get; }
+    public IMethodSymbol? UserSymbol { get; }
 
     public bool HasUserSymbol => UserSymbol != null;
 
@@ -74,6 +74,9 @@ public class MappingBuilderContext : SimpleMappingBuilderContext
 
     /// <inheritdoc cref="MappingBuilders.MappingBuilder.UserMappings"/>
     public IReadOnlyCollection<IUserMapping> UserMappings => MappingBuilder.UserMappings;
+
+    /// <inheritdoc cref="MappingBuilders.MappingBuilder.NewInstanceMappings"/>
+    public IReadOnlyDictionary<TypeMappingKey, INewInstanceMapping> NewInstanceMappings => MappingBuilder.NewInstanceMappings;
 
     /// <summary>
     /// Tries to find an existing mapping with the provided name.
@@ -172,7 +175,16 @@ public class MappingBuilderContext : SimpleMappingBuilderContext
         Location? diagnosticLocation = null
     )
     {
-        return FindMapping(key) ?? FindOrBuildMapping(key.NonNullable(), options, diagnosticLocation);
+        if (FindMapping(key) is { } mapping)
+            return mapping;
+
+        // if a user mapping is referenced
+        // build it with the exact types
+        // as it may expect a nullable source type
+        if (key.Configuration.UseNamedMapping != null)
+            return BuildMapping(key, options, diagnosticLocation);
+
+        return FindOrBuildMapping(key.NonNullable(), options, diagnosticLocation);
     }
 
     /// <summary>

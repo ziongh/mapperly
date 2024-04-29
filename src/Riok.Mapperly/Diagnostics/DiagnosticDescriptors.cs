@@ -667,6 +667,56 @@ public static class DiagnosticDescriptors
             true
         );
 
+    public static readonly DiagnosticDescriptor RuntimeTargetTypeMappingNoContentMappings =
+        new(
+            "RMG069",
+            "Runtime target type or generic type mapping does not match any mappings",
+            "Runtime target type or generic type mapping does not match any mappings",
+            DiagnosticCategories.Mapper,
+            DiagnosticSeverity.Warning,
+            true
+        );
+
+    public static readonly DiagnosticDescriptor ConfiguredMappingNestedMemberNotFound =
+        new(
+            "RMG070",
+            "Mapping nested member not found",
+            "Specified nested member {0} on source type {1} was not found",
+            DiagnosticCategories.Mapper,
+            DiagnosticSeverity.Error,
+            true
+        );
+
+    public static readonly DiagnosticDescriptor NestedMemberNotUsed =
+        new(
+            "RMG071",
+            "Nested properties mapping is not used",
+            "Configured nested member {0} on source type {1} is not used",
+            DiagnosticCategories.Mapper,
+            DiagnosticSeverity.Warning,
+            true
+        );
+
+    public static readonly DiagnosticDescriptor ReferencedMappingSourceTypeMismatch =
+        new(
+            "RMG072",
+            "The source type of the referenced mapping does not match",
+            "The source type {1} of the referenced mapping {0} does not match the expected type {2}",
+            DiagnosticCategories.Mapper,
+            DiagnosticSeverity.Warning,
+            true
+        );
+
+    public static readonly DiagnosticDescriptor ReferencedMappingTargetTypeMismatch =
+        new(
+            "RMG073",
+            "The target type of the referenced mapping does not match",
+            "The target type {1} of the referenced mapping {0} does not match the expected type {2}",
+            DiagnosticCategories.Mapper,
+            DiagnosticSeverity.Warning,
+            true
+        );
+
     private static string BuildHelpUri(string id)
     {
 #if ENV_NEXT

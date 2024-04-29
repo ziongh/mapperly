@@ -195,8 +195,10 @@ public class ObjectPropertyUseNamedMappingTest
             "record B(string V);"
         );
         TestHelper
-            .GenerateMapper(source)
+            .GenerateMapper(source, TestHelperOptions.AllowDiagnostics)
             .Should()
+            .HaveDiagnostic(DiagnosticDescriptors.ReferencedMappingSourceTypeMismatch)
+            .HaveAssertedAllDiagnostics()
             .HaveMapMethodBody(
                 """
                 var target = new global::B(MyMapping(source.V.ToString()));
@@ -224,6 +226,10 @@ public class ObjectPropertyUseNamedMappingTest
                 DiagnosticDescriptors.CouldNotCreateMapping,
                 "Could not create mapping from object to byte. Consider implementing the mapping manually."
             )
+            .HaveDiagnostic(
+                DiagnosticDescriptors.ReferencedMappingSourceTypeMismatch,
+                "The source type byte of the referenced mapping MyMapping does not match the expected type object"
+            )
             .HaveAssertedAllDiagnostics()
             .HaveMapMethodBody(
                 """
@@ -246,8 +252,10 @@ public class ObjectPropertyUseNamedMappingTest
             "record B(int V);"
         );
         TestHelper
-            .GenerateMapper(source)
+            .GenerateMapper(source, TestHelperOptions.AllowDiagnostics)
             .Should()
+            .HaveDiagnostic(DiagnosticDescriptors.ReferencedMappingTargetTypeMismatch)
+            .HaveAssertedAllDiagnostics()
             .HaveMapMethodBody(
                 """
                 var target = new global::B(int.Parse(MyMapping(source.V)));
@@ -275,6 +283,10 @@ public class ObjectPropertyUseNamedMappingTest
                 DiagnosticDescriptors.CouldNotCreateMapping,
                 "Could not create mapping from object to byte. Consider implementing the mapping manually."
             )
+            .HaveDiagnostic(
+                DiagnosticDescriptors.ReferencedMappingTargetTypeMismatch,
+                "The target type object of the referenced mapping MyMapping does not match the expected type byte"
+            )
             .HaveAssertedAllDiagnostics()
             .HaveMapMethodBody(
                 """
@@ -297,8 +309,11 @@ public class ObjectPropertyUseNamedMappingTest
             "record B(int V);"
         );
         TestHelper
-            .GenerateMapper(source)
+            .GenerateMapper(source, TestHelperOptions.AllowDiagnostics)
             .Should()
+            .HaveDiagnostic(DiagnosticDescriptors.ReferencedMappingSourceTypeMismatch)
+            .HaveDiagnostic(DiagnosticDescriptors.ReferencedMappingTargetTypeMismatch)
+            .HaveAssertedAllDiagnostics()
             .HaveMapMethodBody(
                 """
                 var target = new global::B(int.Parse(MyMapping(source.V.ToString())));
@@ -344,6 +359,36 @@ public class ObjectPropertyUseNamedMappingTest
             """,
             "record C(int Value);",
             "record D(string Value);"
+        );
+        return TestHelper.VerifyGenerator(source);
+    }
+
+    [Fact]
+    public Task ShouldPassNullValueToNullableUserMappingMethod()
+    {
+        var source = TestSourceBuilder.MapperWithBodyAndTypes(
+            """
+            [MapProperty(nameof(A.Value), nameof(B.Value), Use = nameof(MapString)]
+            public partial B Map(A source);
+
+            [UserMapping(Default = false)]
+            private string MapString(string? source)
+                => source ?? "(null)";
+            """,
+            """
+            class A
+            {
+                public string? Value { get; }
+                public string? Value2 { get; }
+            }
+            """,
+            """
+            class B
+            {
+                public string Value { set; }
+                public string Value2 { set; }
+            }
+            """
         );
         return TestHelper.VerifyGenerator(source);
     }

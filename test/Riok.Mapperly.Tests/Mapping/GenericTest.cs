@@ -21,6 +21,80 @@ public class GenericTest
     }
 
     [Fact]
+    public Task WithGenericSourceAndTargetInNullableDisabledContext()
+    {
+        var source = TestSourceBuilder.MapperWithBodyAndTypes(
+            """
+            private partial TTarget Map<TSource, TTarget>(TSource source);
+
+            private partial B MapToB(A source);
+            private partial D MapToD(C source);
+            """,
+            "record struct A(string Value);",
+            "record struct B(string Value);",
+            "record C(string Value1);",
+            "record D(string Value1);"
+        );
+        return TestHelper.VerifyGenerator(source, TestHelperOptions.DisabledNullable);
+    }
+
+    [Fact]
+    public Task WithNestedGenericSourceAndTarget()
+    {
+        var source = TestSourceBuilder.MapperWithBodyAndTypes(
+            """
+            private partial IEnumerable<TTarget> Map<TSource, TTarget>(IEnumerable<TSource> source);
+
+            private partial IEnumerable<B> MapToB(IEnumerable<A> source);
+            private partial List<D> MapToD(IReadOnlyCollection<C> source);
+            """,
+            "record struct A(string Value);",
+            "record struct B(string Value);",
+            "record C(string Value1);",
+            "record D(string Value1);"
+        );
+        return TestHelper.VerifyGenerator(source);
+    }
+
+    [Fact]
+    public Task WithQueryableGenericSourceAndTarget()
+    {
+        var source = TestSourceBuilder.MapperWithBodyAndTypes(
+            """
+            private partial IQueryable<TTarget> Map<TSource, TTarget>(IQueryable<TSource> source);
+
+            private partial IQueryable<B> MapToB(IQueryable<A> source);
+            private partial IQueryable<D> MapToD(IQueryable<C> source);
+            """,
+            "record A(string Value);",
+            "record B(string Value);",
+            "record C(string Value1);",
+            "record D(string Value1);"
+        );
+        return TestHelper.VerifyGenerator(source);
+    }
+
+    [Fact]
+    public Task WithTypeConstrainedQueryableGenericSourceAndTarget()
+    {
+        var source = TestSourceBuilder.MapperWithBodyAndTypes(
+            """
+            private partial TTarget Map<TSource, TTarget, TSource2, TTarget2>(TSource source)
+                where TSource : IQueryable<TSource2>
+                where TTarget : IQueryable<TTarget2>;
+
+            private partial IQueryable<B> MapToB(IQueryable<A> source);
+            private partial IQueryable<D> MapToD(IQueryable<C> source);
+            """,
+            "record A(string Value);",
+            "record B(string Value);",
+            "record C(string Value1);",
+            "record D(string Value1);"
+        );
+        return TestHelper.VerifyGenerator(source);
+    }
+
+    [Fact]
     public void WithGenericSource()
     {
         var source = TestSourceBuilder.MapperWithBodyAndTypes(
@@ -48,7 +122,8 @@ public class GenericTest
                     _ => throw new System.ArgumentException($"Cannot map {source.GetType()} to {typeof(object)} as there is no known type mapping", nameof(source)),
                 };
                 """
-            );
+            )
+            .HaveMapMethodWithGenericConstraints(null);
     }
 
     [Fact]
@@ -61,11 +136,14 @@ public class GenericTest
 
             partial B MapToB(A source);
             partial D MapToD(C source);
+            partial F MapToF(E source);
             """,
-            "record struct A(string Value);",
+            "record A(string Value);",
             "record struct B(string Value);",
             "record C(string Value1);",
-            "record D(string Value1);"
+            "record D(string Value1);",
+            "record E(string Value) : A(Value);",
+            "record struct F(string Value) : B(Value);"
         );
         TestHelper
             .GenerateMapper(source)
@@ -74,13 +152,13 @@ public class GenericTest
                 """
                 return source switch
                 {
+                    global::E x => MapToF(x),
                     global::A x => MapToB(x),
-                    global::C x => MapToD(x),
-                    null => throw new System.ArgumentNullException(nameof(source)),
                     _ => throw new System.ArgumentException($"Cannot map {source.GetType()} to {typeof(object)} as there is no known type mapping", nameof(source)),
                 };
                 """
-            );
+            )
+            .HaveMapMethodWithGenericConstraints("where TSource : global::A");
     }
 
     [Fact]
@@ -108,11 +186,11 @@ public class GenericTest
                 {
                     global::A x => MapToB(x),
                     global::C x => MapToD(x),
-                    null => throw new System.ArgumentNullException(nameof(source)),
                     _ => throw new System.ArgumentException($"Cannot map {source.GetType()} to {typeof(object)} as there is no known type mapping", nameof(source)),
                 };
                 """
-            );
+            )
+            .HaveMapMethodWithGenericConstraints("where TSource : notnull");
     }
 
     [Fact]
@@ -139,11 +217,11 @@ public class GenericTest
                 return source switch
                 {
                     global::A x => MapToB(x),
-                    null => throw new System.ArgumentNullException(nameof(source)),
                     _ => throw new System.ArgumentException($"Cannot map {source.GetType()} to {typeof(object)} as there is no known type mapping", nameof(source)),
                 };
                 """
-            );
+            )
+            .HaveMapMethodWithGenericConstraints("where TSource : struct");
     }
 
     [Fact]
@@ -170,11 +248,11 @@ public class GenericTest
                 return source switch
                 {
                     global::A x => MapToB(x),
-                    null => throw new System.ArgumentNullException(nameof(source)),
                     _ => throw new System.ArgumentException($"Cannot map {source.GetType()} to {typeof(object)} as there is no known type mapping", nameof(source)),
                 };
                 """
-            );
+            )
+            .HaveMapMethodWithGenericConstraints("where TSource : unmanaged");
     }
 
     [Fact]
@@ -201,11 +279,11 @@ public class GenericTest
                 return source switch
                 {
                     global::C x => MapToD(x),
-                    null => throw new System.ArgumentNullException(nameof(source)),
                     _ => throw new System.ArgumentException($"Cannot map {source.GetType()} to {typeof(object)} as there is no known type mapping", nameof(source)),
                 };
                 """
-            );
+            )
+            .HaveMapMethodWithGenericConstraints("where TSource : class");
     }
 
     [Fact]
@@ -236,7 +314,8 @@ public class GenericTest
                     _ => throw new System.ArgumentException($"Cannot map {source.GetType()} to {typeof(object)} as there is no known type mapping", nameof(source)),
                 };
                 """
-            );
+            )
+            .HaveMapMethodWithGenericConstraints("where TSource : class");
     }
 
     [Fact]
@@ -267,7 +346,8 @@ public class GenericTest
                     _ => throw new System.ArgumentException($"Cannot map {source.GetType()} to {typeof(object)} as there is no known type mapping", nameof(source)),
                 };
                 """
-            );
+            )
+            .HaveMapMethodWithGenericConstraints("where TSource : class");
     }
 
     [Fact]
@@ -299,7 +379,8 @@ public class GenericTest
                     _ => throw new System.ArgumentException($"Cannot map {source.GetType()} to {typeof(TTarget)} as there is no known type mapping", nameof(source)),
                 };
                 """
-            );
+            )
+            .HaveMapMethodWithGenericConstraints("where TSource : class where TTarget : class");
     }
 
     [Fact]
@@ -334,7 +415,8 @@ public class GenericTest
                     _ => throw new System.ArgumentException($"Cannot map {source.GetType()} to {typeof(global::BaseDto)} as there is no known type mapping", nameof(source)),
                 };
                 """
-            );
+            )
+            .HaveMapMethodWithGenericConstraints(null);
     }
 
     [Fact]
@@ -361,11 +443,79 @@ public class GenericTest
                 {
                     global::A x when typeof(TTarget).IsAssignableFrom(typeof(global::B)) => (TTarget)(object)MapToB(x),
                     global::C x when typeof(TTarget).IsAssignableFrom(typeof(global::D)) => (TTarget)(object)MapToD(x),
-                    null => throw new System.ArgumentNullException(nameof(source)),
                     _ => throw new System.ArgumentException($"Cannot map {source.GetType()} to {typeof(TTarget)} as there is no known type mapping", nameof(source)),
                 };
                 """
-            );
+            )
+            .HaveMapMethodWithGenericConstraints(null);
+    }
+
+    [Fact]
+    public Task WithGenericTargetMapWithObjectFactory()
+    {
+        var source = TestSourceBuilder.MapperWithBodyAndTypes(
+            """
+            partial TTarget Map<TTarget>(object source);
+
+            [ObjectFactory]
+            B CreateB(A source) => new B(default!);
+
+            partial B MapToB(A source);
+
+            partial D MapToD(C source);
+            """,
+            "record struct A(string Value);",
+            "record struct B(string Value);",
+            "record C(string Value1);",
+            "record D(string Value1);"
+        );
+
+        return TestHelper.VerifyGenerator(source);
+    }
+
+    [Fact]
+    public Task WithGenericTargetMixedMapping()
+    {
+        var source = TestSourceBuilder.MapperWithBodyAndTypes(
+            """
+            partial TTarget Map<TTarget>(object source);
+
+            partial B MapToBInternal(A source);
+
+            B MapToB(A source) => MapToBInternal(source);
+
+            partial D MapToD(C source);
+            """,
+            "record struct A(string Value);",
+            "record struct B(string Value);",
+            "record C(string Value1);",
+            "record D(string Value1);"
+        );
+
+        return TestHelper.VerifyGenerator(source);
+    }
+
+    [Fact]
+    public Task WithGenericTargetMixedMappingWithUserMappingAttribute()
+    {
+        var source = TestSourceBuilder.MapperWithBodyAndTypes(
+            """
+            partial TTarget Map<TTarget>(object source);
+
+            partial B MapToBInternal(A source);
+
+            [UserMapping(Default = true)]
+            B MapToB(A source) => MapToBInternal(source);
+
+            partial D MapToD(C source);
+            """,
+            "record struct A(string Value);",
+            "record struct B(string Value);",
+            "record C(string Value1);",
+            "record D(string Value1);"
+        );
+
+        return TestHelper.VerifyGenerator(source);
     }
 
     [Fact]
@@ -392,11 +542,11 @@ public class GenericTest
                 return source switch
                 {
                     global::C x when typeof(TTarget).IsAssignableFrom(typeof(global::D)) => (TTarget)(object)MapToD(x),
-                    null => throw new System.ArgumentNullException(nameof(source)),
                     _ => throw new System.ArgumentException($"Cannot map {source.GetType()} to {typeof(TTarget)} as there is no known type mapping", nameof(source)),
                 };
                 """
-            );
+            )
+            .HaveMapMethodWithGenericConstraints("where TTarget : global::D");
     }
 
     [Fact]
@@ -427,11 +577,11 @@ public class GenericTest
                 {
                     global::A x when typeof(TTarget).IsAssignableFrom(typeof(global::C)) => (TTarget)(object)MapToC(x),
                     global::B x when typeof(TTarget).IsAssignableFrom(typeof(global::D)) => (TTarget)(object)MapToD(x),
-                    null => throw new System.ArgumentNullException(nameof(source)),
                     _ => throw new System.ArgumentException($"Cannot map {source.GetType()} to {typeof(TTarget)} as there is no known type mapping", nameof(source)),
                 };
                 """
-            );
+            )
+            .HaveMapMethodWithGenericConstraints(null);
     }
 
     [Fact]
@@ -459,11 +609,11 @@ public class GenericTest
                 return source switch
                 {
                     global::C x when typeof(TTarget).IsAssignableFrom(typeof(global::D)) => (TTarget)(object)MapToD(x),
-                    null => throw new System.ArgumentNullException(nameof(source)),
                     _ => throw new System.ArgumentException($"Cannot map {source.GetType()} to {typeof(TTarget)} as there is no known type mapping", nameof(source)),
                 };
                 """
-            );
+            )
+            .HaveMapMethodWithGenericConstraints("where TSource : global::C where TTarget : global::D");
     }
 
     [Fact]
@@ -496,7 +646,26 @@ public class GenericTest
                     _ => throw new System.ArgumentException($"Cannot map {source.GetType()} to {typeof(TTarget)} as there is no known type mapping", nameof(source)),
                 };
                 """
-            );
+            )
+            .HaveMapMethodWithGenericConstraints(null);
+    }
+
+    [Fact]
+    public Task WithGenericConstructorConstraint()
+    {
+        var source = TestSourceBuilder.MapperWithBodyAndTypes(
+            """
+            private partial TTarget Map<TSource, TTarget>(TSource source) where TSource : new() where TTarget : new();
+
+            private partial B MapToB(A source);
+            private partial D MapToD(C source);
+            """,
+            "record struct A(string Value) { public A() : this(default!) {} }",
+            "record struct B(string Value) { public B() : this(default!) {} }",
+            "record C(string Value1);",
+            "record D(string Value1);"
+        );
+        return TestHelper.VerifyGenerator(source);
     }
 
     [Fact]
@@ -529,6 +698,24 @@ public class GenericTest
             private partial D MapToD(C source, [ReferenceHandler] IReferenceHandler refHandler);
             """,
             TestSourceBuilderOptions.WithReferenceHandling,
+            "record struct A(string Value);",
+            "record struct B(string Value);",
+            "record C(string Value1);",
+            "record D(string Value1);"
+        );
+        return TestHelper.VerifyGenerator(source);
+    }
+
+    [Fact]
+    public Task WithGenericSourceAndTargetAndUnboundGenericShouldDiagnostic()
+    {
+        var source = TestSourceBuilder.MapperWithBodyAndTypes(
+            """
+            private partial TTarget Map<TSource, TTarget, TUnknown>(TSource source);
+
+            private partial B MapToB(A source);
+            private partial D MapToD(C source);
+            """,
             "record struct A(string Value);",
             "record struct B(string Value);",
             "record C(string Value1);",

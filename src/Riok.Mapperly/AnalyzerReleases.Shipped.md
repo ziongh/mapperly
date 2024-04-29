@@ -153,3 +153,15 @@ RMG065  | Mapper   | Warning  | Cannot configure an object mapping on a queryabl
 RMG066  | Mapper   | Warning  | No members are mapped in an object mapping
 RMG067  | Mapper   | Error    | Invalid usage of the MapPropertyAttribute
 RMG068  | Mapper   | Info     | Cannot inline user implemented queryable expression mapping
+RMG069  | Mapper   | Warning  | Runtime target type or generic type mapping does not match any mappings
+RMG070  | Mapper   | Error    | Mapping nested member not found
+
+## Release 3.6
+
+### New Rules
+
+Rule ID | Category | Severity | Notes
+--------|----------|----------|-------
+RMG071  | Mapper   | Warning  | Nested properties mapping is not used
+RMG072  | Mapper   | Warning  | The source type of the referenced mapping does not match
+RMG073  | Mapper   | Warning  | The target type of the referenced mapping does not match
