@@ -116,3 +116,52 @@ Rule ID | Category | Severity | Notes
 RMG048  | Mapper   | Error    | Used mapper members cannot be nullable
 RMG049  | Mapper   | Warning  | Source member is ignored and also explicitly mapped
 RMG050  | Mapper   | Warning  | Target member is ignored and also explicitly mapped
+
+## Release 3.3
+
+### New Rules
+
+Rule ID | Category | Severity | Notes
+--------|----------|----------|-------
+RMG051  | Mapper   | Warning  | Invalid ignore source member found, nested ignores are not supported
+RMG052  | Mapper   | Warning  | Invalid ignore target member found, nested ignores are not supported
+RMG053  | Mapper   | Error    | The flag MemberVisibility.Accessible cannot be disabled, this feature requires .NET 8.0 or greater
+RMG054  | Mapper   | Error    | Mapper class containing 'static partial' method must not have any instance methods 
+RMG055  | Mapper   | Error    | The source type does not implement ToString with the provided formatting parameters, string format and format provider cannot be applied
+RMG056  | Mapper   | Error    | Invalid format provider signature
+RMG057  | Mapper   | Error    | Format provider not found
+RMG058  | Mapper   | Error    | Multiple default format providers found, only one is allowed
+
+### Removed Rules
+Rule ID | Category | Severity | Notes
+--------|----------|----------|-------
+RMG018  | Mapper   | Disabled | Partial static mapping method in an instance mapper
+
+## Release 3.5
+
+### New Rules
+
+Rule ID | Category | Severity | Notes
+--------|----------|----------|-------
+RMG059  | Mapper   | Error    | Multiple default user mappings found, only one is allowed
+RMG060  | Mapper   | Warning  | Multiple user mappings discovered without specifying an explicit default
+RMG061  | Mapper   | Error    | The referenced mapping was not found
+RMG062  | Mapper   | Error    | The referenced mapping name is ambiguous
+RMG063  | Mapper   | Error    | Cannot configure an enum mapping on a non-enum mapping
+RMG064  | Mapper   | Error    | Cannot configure an object mapping on a non-object mapping
+RMG065  | Mapper   | Warning  | Cannot configure an object mapping on a queryable projection mapping, apply the configurations to an object mapping method instead
+RMG066  | Mapper   | Warning  | No members are mapped in an object mapping
+RMG067  | Mapper   | Error    | Invalid usage of the MapPropertyAttribute
+RMG068  | Mapper   | Info     | Cannot inline user implemented queryable expression mapping
+RMG069  | Mapper   | Warning  | Runtime target type or generic type mapping does not match any mappings
+RMG070  | Mapper   | Error    | Mapping nested member not found
+
+## Release 3.6
+
+### New Rules
+
+Rule ID | Category | Severity | Notes
+--------|----------|----------|-------
+RMG071  | Mapper   | Warning  | Nested properties mapping is not used
+RMG072  | Mapper   | Warning  | The source type of the referenced mapping does not match
+RMG073  | Mapper   | Warning  | The target type of the referenced mapping does not match

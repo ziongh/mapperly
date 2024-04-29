@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
+using Riok.Mapperly.Abstractions;
 using Riok.Mapperly.IntegrationTests.Models;
 
 namespace Riok.Mapperly.IntegrationTests.Dto
@@ -11,6 +12,7 @@ namespace Riok.Mapperly.IntegrationTests.Dto
         {
             CtorValue = ctorValue;
             CtorValue2 = ctorValue2;
+            PrivateValue = ctorValue + 21;
         }
 
         public int CtorValue { get; set; }
@@ -44,6 +46,10 @@ namespace Riok.Mapperly.IntegrationTests.Dto
         public TestObjectNestedDto? NestedNullable { get; set; }
 
         public TestObjectNestedDto NestedNullableTargetNotNullable { get; set; } = new();
+
+        public int NestedMemberId { get; set; }
+
+        public int NestedMemberObjectIntValue { get; set; }
 
         public string StringNullableTargetNotNullable { get; set; } = string.Empty;
 
@@ -118,8 +124,19 @@ namespace Riok.Mapperly.IntegrationTests.Dto
         [Obsolete]
         public int IgnoredObsoleteValue { get; set; }
 
+        [MapperIgnore]
+        public int IgnoredMemberValue { get; set; }
+
         public DateOnly DateTimeValueTargetDateOnly { get; set; }
 
         public TimeOnly DateTimeValueTargetTimeOnly { get; set; }
+
+        public string FormattedIntValue { get; set; } = string.Empty;
+
+        public string FormattedDateValue { get; set; } = string.Empty;
+
+        public int ExposePrivateValue => PrivateValue;
+
+        private int PrivateValue { get; set; }
     }
 }

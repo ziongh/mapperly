@@ -18,16 +18,30 @@ internal static class SymbolExtensions
         typeof(Version).FullName!
     );
 
+    internal static Location? GetSyntaxLocation(this ISymbol symbol) =>
+        symbol.DeclaringSyntaxReferences.FirstOrDefault()?.GetSyntax().GetLocation();
+
     internal static string FullyQualifiedIdentifierName(this ITypeSymbol typeSymbol) =>
         typeSymbol.ToDisplayString(_fullyQualifiedNullableFormat);
 
-    internal static bool IsImmutable(this ISymbol symbol) =>
-        symbol is INamedTypeSymbol namedSymbol
-        && (
-            namedSymbol.IsUnmanagedType
+    internal static bool IsImmutable(this ISymbol symbol)
+    {
+        if (symbol is not INamedTypeSymbol namedSymbol)
+            return false;
+
+        return namedSymbol.IsUnmanagedType
             || namedSymbol.SpecialType == SpecialType.System_String
-            || _wellKnownImmutableTypes.Contains(namedSymbol.ToDisplayString())
-        );
+            || IsDelegate(symbol)
+            || _wellKnownImmutableTypes.Contains(namedSymbol.ToDisplayString());
+    }
+
+    internal static bool IsDelegate(this ISymbol symbol)
+    {
+        if (symbol is not INamedTypeSymbol namedSymbol)
+            return false;
+
+        return namedSymbol.DelegateInvokeMethod != null;
+    }
 
     internal static int GetInheritanceLevel(this ITypeSymbol symbol)
     {
@@ -42,6 +56,12 @@ internal static class SymbolExtensions
     }
 
     internal static bool IsArrayType(this ITypeSymbol symbol) => symbol is IArrayTypeSymbol;
+
+    internal static bool IsArrayType(this ITypeSymbol symbol, [NotNullWhen(true)] out IArrayTypeSymbol? arrayTypeSymbol)
+    {
+        arrayTypeSymbol = symbol as IArrayTypeSymbol;
+        return arrayTypeSymbol != null;
+    }
 
     internal static bool IsEnum(this ITypeSymbol t) => TryGetEnumUnderlyingType(t, out _);
 
@@ -58,12 +78,59 @@ internal static class SymbolExtensions
         return namedType.GetMembers(methodName).OfType<IMethodSymbol>().FirstOrDefault(m => m.IsStatic && m.IsGenericMethod);
     }
 
+    internal static bool Implements(this ITypeSymbol t, INamedTypeSymbol interfaceSymbol)
+    {
+        return SymbolEqualityComparer.Default.Equals(t, interfaceSymbol)
+            || t.AllInterfaces.Any(x => SymbolEqualityComparer.Default.Equals(x, interfaceSymbol));
+    }
+
+    internal static bool ExtendsOrImplementsGeneric(
+        this ITypeSymbol t,
+        INamedTypeSymbol genericSymbol,
+        [NotNullWhen(true)] out INamedTypeSymbol? typedGenericSymbol
+    )
+    {
+        return genericSymbol.TypeKind == TypeKind.Interface
+            ? t.ImplementsGeneric(genericSymbol, out typedGenericSymbol)
+            : t.ExtendsGeneric(genericSymbol, out typedGenericSymbol);
+    }
+
+    internal static bool ExtendsGeneric(
+        this ITypeSymbol t,
+        INamedTypeSymbol genericSymbol,
+        [NotNullWhen(true)] out INamedTypeSymbol? typedGenericSymbol
+    )
+    {
+        Debug.Assert(genericSymbol.IsGenericType);
+
+        if (SymbolEqualityComparer.Default.Equals(t.OriginalDefinition, genericSymbol))
+        {
+            typedGenericSymbol = (INamedTypeSymbol)t;
+            return true;
+        }
+
+        for (var baseType = t.BaseType; baseType != null; baseType = baseType.BaseType)
+        {
+            if (!SymbolEqualityComparer.Default.Equals(baseType.OriginalDefinition, genericSymbol))
+                continue;
+
+            typedGenericSymbol = baseType;
+            return true;
+        }
+
+        typedGenericSymbol = null;
+        return false;
+    }
+
     internal static bool ImplementsGeneric(
         this ITypeSymbol t,
         INamedTypeSymbol genericInterfaceSymbol,
         [NotNullWhen(true)] out INamedTypeSymbol? typedInterface
     )
     {
+        Debug.Assert(genericInterfaceSymbol.IsGenericType);
+        Debug.Assert(genericInterfaceSymbol.TypeKind == TypeKind.Interface);
+
         if (SymbolEqualityComparer.Default.Equals(t.OriginalDefinition, genericInterfaceSymbol))
         {
             typedInterface = (INamedTypeSymbol)t;
@@ -91,6 +158,9 @@ internal static class SymbolExtensions
         out bool isExplicit
     )
     {
+        Debug.Assert(genericInterfaceSymbol.IsGenericType);
+        Debug.Assert(genericInterfaceSymbol.TypeKind == TypeKind.Interface);
+
         if (SymbolEqualityComparer.Default.Equals(t.OriginalDefinition, genericInterfaceSymbol))
         {
             typedInterface = (INamedTypeSymbol)t;
@@ -98,8 +168,8 @@ internal static class SymbolExtensions
             return true;
         }
 
-        typedInterface = t.AllInterfaces.FirstOrDefault(
-            x => x.IsGenericType && SymbolEqualityComparer.Default.Equals(x.OriginalDefinition, genericInterfaceSymbol)
+        typedInterface = t.AllInterfaces.FirstOrDefault(x =>
+            x.IsGenericType && SymbolEqualityComparer.Default.Equals(x.OriginalDefinition, genericInterfaceSymbol)
         );
 
         if (typedInterface == null)

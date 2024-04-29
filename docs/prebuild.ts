@@ -1,6 +1,7 @@
 const { exec } = require('child_process');
 const { readFile, writeFile, copyFile, mkdir, readdir, rm } =
   require('fs').promises;
+const { existsSync } = require('fs');
 const { join } = require('path');
 const util = require('util');
 const { marked } = require('marked');
@@ -19,7 +20,7 @@ async function emptyDirectory(dir: string): Promise<void> {
 async function buildApiDocs(): Promise<void> {
   const targetDir = './docs/api';
   const dll =
-    '../src/Riok.Mapperly.Abstractions/bin/Debug/netstandard2.0/Riok.Mapperly.Abstractions.dll';
+    '../artifacts/bin/Riok.Mapperly.Abstractions/debug/Riok.Mapperly.Abstractions.dll';
 
   // clean target directory
   await emptyDirectory(targetDir);
@@ -47,6 +48,8 @@ async function buildAnalyzerRulesData(): Promise<void> {
   // extract analyzer rules from AnalyzerReleases.Shipped.md and write to a json file
   const targetFile = join(generatedDataDir, 'analyzer-rules.json');
   const sourceFile = '../src/Riok.Mapperly/AnalyzerReleases.Shipped.md';
+  const analyzerDiagnosticsDocsDir =
+    './docs/configuration/analyzer-diagnostics';
 
   let rules = {};
   let removingRules = true;
@@ -72,6 +75,9 @@ async function buildAnalyzerRulesData(): Promise<void> {
         category: row[1].text,
         severity: row[2].text,
         notes: row[3].text,
+        hasDocumentation: existsSync(
+          join(analyzerDiagnosticsDocsDir, `${id}.mdx`),
+        ),
       };
     }
 
@@ -91,17 +97,14 @@ async function buildSamples(): Promise<void> {
   const targetDir = join(generatedDataDir, 'samples');
   await mkdir(targetDir);
 
-  const sampleProject = '../samples/Riok.Mapperly.Sample';
-  const projectFilesToCopy = ['CarMapper.cs', 'Car.cs', 'CarDto.cs'];
-  const generatedMapperFile = join(
-    sampleProject,
-    'obj/Debug/net8.0/generated/Riok.Mapperly/Riok.Mapperly.MapperGenerator/CarMapper.g.cs',
-  );
-
   // Copy generated mapper to target dir
+  const generatedMapperFile =
+    '../artifacts/obj/Riok.Mapperly.Sample/debug/generated/Riok.Mapperly/Riok.Mapperly.MapperGenerator/CarMapper.g.cs';
   await copyFile(generatedMapperFile, join(targetDir, 'CarMapper.g.cs'));
 
   // Copy sample project files to target dir
+  const sampleProject = '../samples/Riok.Mapperly.Sample';
+  const projectFilesToCopy = ['CarMapper.cs', 'Car.cs', 'CarDto.cs'];
   for (const file of projectFilesToCopy) {
     await copyFile(join(sampleProject, file), join(targetDir, file));
   }

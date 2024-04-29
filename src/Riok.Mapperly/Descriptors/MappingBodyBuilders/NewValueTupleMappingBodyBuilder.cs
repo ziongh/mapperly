@@ -1,6 +1,6 @@
 using System.Diagnostics.CodeAnalysis;
 using Microsoft.CodeAnalysis;
-using Riok.Mapperly.Abstractions;
+using Riok.Mapperly.Configuration;
 using Riok.Mapperly.Descriptors.MappingBodyBuilders.BuilderContext;
 using Riok.Mapperly.Descriptors.Mappings;
 using Riok.Mapperly.Descriptors.Mappings.MemberMappings;
@@ -67,7 +67,7 @@ public static class NewValueTupleMappingBodyBuilder
                 return false;
             }
 
-            if (!TryFindConstructorParameterSourcePath(ctx, targetMember, out var sourcePath))
+            if (!TryFindConstructorParameterSourcePath(ctx, targetMember, out var sourcePath, out var memberConfig))
             {
                 ctx.BuilderContext.ReportDiagnostic(
                     DiagnosticDescriptors.SourceMemberNotFound,
@@ -80,11 +80,12 @@ public static class NewValueTupleMappingBodyBuilder
             }
 
             // nullability is handled inside the member expressionMapping
-            var paramType = targetMember.Type.WithNullableAnnotation(targetMember.NullableAnnotation);
-            var delegateMapping =
-                ctx.BuilderContext.FindMapping(sourcePath.MemberType, paramType)
-                ?? ctx.BuilderContext.FindOrBuildMapping(sourcePath.Member.Type.NonNullable(), paramType.NonNullable());
-
+            var targetMemberType = ctx.BuilderContext.SymbolAccessor.UpgradeNullable(targetMember.Type);
+            var mappingKey = new TypeMappingKey(sourcePath.MemberType, targetMemberType, memberConfig?.ToTypeMappingConfiguration());
+            var delegateMapping = ctx.BuilderContext.FindOrBuildLooseNullableMapping(
+                mappingKey,
+                diagnosticLocation: memberConfig?.Location
+            );
             if (delegateMapping == null)
             {
                 ctx.BuilderContext.ReportDiagnostic(
@@ -111,14 +112,7 @@ public static class NewValueTupleMappingBodyBuilder
                 return false;
             }
 
-            var memberMapping = new NullMemberMapping(
-                delegateMapping,
-                sourcePath,
-                paramType,
-                ctx.BuilderContext.GetNullFallbackValue(paramType),
-                !ctx.BuilderContext.IsExpression
-            );
-
+            var memberMapping = ctx.BuildNullMemberMapping(sourcePath, delegateMapping, targetMemberType);
             var ctorMapping = new ValueTupleConstructorParameterMapping(targetMember, memberMapping);
             constructorParameterMappings.Add(ctorMapping);
             mappedTargetMemberNames.Add(targetMember.Name);
@@ -130,10 +124,12 @@ public static class NewValueTupleMappingBodyBuilder
     private static bool TryFindConstructorParameterSourcePath(
         INewValueTupleBuilderContext<INewValueTupleMapping> ctx,
         IFieldSymbol field,
-        [NotNullWhen(true)] out MemberPath? sourcePath
+        [NotNullWhen(true)] out MemberPath? sourcePath,
+        out MemberMappingConfiguration? memberConfig
     )
     {
         sourcePath = null;
+        memberConfig = null;
 
         if (!ctx.MemberConfigsByRootTargetName.TryGetValue(field.Name, out var memberConfigs))
             return TryBuildConstructorParameterSourcePath(ctx, field, out sourcePath);
@@ -154,7 +150,7 @@ public static class NewValueTupleMappingBodyBuilder
             );
         }
 
-        var memberConfig = initMemberPaths.First();
+        memberConfig = initMemberPaths.First();
         if (ctx.BuilderContext.SymbolAccessor.TryFindMemberPath(ctx.Mapping.SourceType, memberConfig.Source.Path, out sourcePath))
             return true;
 
@@ -173,17 +169,7 @@ public static class NewValueTupleMappingBodyBuilder
         out MemberPath? sourcePath
     )
     {
-        var ignoreCase = ctx.BuilderContext.MapperConfiguration.PropertyNameMappingStrategy == PropertyNameMappingStrategy.CaseInsensitive;
-
-        if (
-            ctx.BuilderContext.SymbolAccessor.TryFindMemberPath(
-                ctx.Mapping.SourceType,
-                MemberPathCandidateBuilder.BuildMemberPathCandidates(field.Name),
-                ctx.IgnoredSourceMemberNames,
-                ignoreCase,
-                out sourcePath
-            )
-        )
+        if (ctx.TryFindNestedSourceMembersPath(field.Name, out sourcePath))
         {
             return true;
         }
@@ -193,17 +179,16 @@ public static class NewValueTupleMappingBodyBuilder
         if (!ctx.Mapping.SourceType.IsTupleType || ctx.Mapping.SourceType is not INamedTypeSymbol namedType)
             return false;
 
-        var mappableField = namedType.TupleElements.FirstOrDefault(
-            x =>
-                x.CorrespondingTupleField != default
-                && !ctx.IgnoredSourceMemberNames.Contains(x.Name)
-                && string.Equals(field.CorrespondingTupleField!.Name, x.CorrespondingTupleField!.Name)
+        var mappableField = namedType.TupleElements.FirstOrDefault(x =>
+            x.CorrespondingTupleField != default
+            && !ctx.IgnoredSourceMemberNames.Contains(x.Name)
+            && string.Equals(field.CorrespondingTupleField!.Name, x.CorrespondingTupleField!.Name)
         );
 
         if (mappableField == default)
             return false;
 
-        sourcePath = new MemberPath(new[] { new FieldMember(mappableField) });
+        sourcePath = new MemberPath(new[] { new FieldMember(mappableField, ctx.BuilderContext.SymbolAccessor) });
         return true;
     }
 }

@@ -94,6 +94,29 @@ public record MapperConfiguration
     public IgnoreObsoleteMembersStrategy? IgnoreObsoleteMembersStrategy { get; init; }
 
     /// <summary>
+    /// Defines the strategy used when emitting warnings for unmapped members.
+    /// By default this is <see cref="RequiredMappingStrategy.Both"/>, emitting warnings for unmapped source and target members.
+    /// </summary>
+    public RequiredMappingStrategy? RequiredMappingStrategy { get; init; }
+
+    /// <summary>
+    /// Determines the access level of members that Mapperly will map.
+    /// </summary>
+    public MemberVisibility? IncludedMembers { get; init; }
+
+    /// <summary>
+    /// Controls the priority of constructors used in mapping.
+    /// When <c>true</c>, a parameterless constructor is prioritized over constructors with parameters.
+    /// When <c>false</c>, accessible constructors are ordered in descending order by their parameter count.
+    /// </summary>
+    public bool? PreferParameterlessConstructors { get; init; }
+
+    /// <summary>
+    /// Whether to consider non-partial methods in a mapper as user implemented mapping methods.
+    /// </summary>
+    public bool? AutoUserMappings { get; init; }
+
+    /// <summary>
     /// Whether to map only primitive types.
     /// </summary>
     public bool? MapOnlyPrimitives { get; init; }

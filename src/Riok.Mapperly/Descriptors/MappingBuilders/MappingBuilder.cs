@@ -1,18 +1,21 @@
-using Microsoft.CodeAnalysis;
 using Riok.Mapperly.Descriptors.Mappings;
 using Riok.Mapperly.Descriptors.Mappings.UserMappings;
+using Riok.Mapperly.Symbols;
 
 namespace Riok.Mapperly.Descriptors.MappingBuilders;
 
-public class MappingBuilder
+public class MappingBuilder(MappingCollection mappings, MapperDeclaration mapperDeclaration)
 {
+    private readonly HashSet<string> _resolvedMappingNames = new();
+
     private delegate INewInstanceMapping? BuildMapping(MappingBuilderContext context);
 
     private static readonly IReadOnlyCollection<BuildMapping> _builders = new BuildMapping[]
     {
+        UseNamedMappingBuilder.TryBuildMapping,
         NullableMappingBuilder.TryBuildMapping,
         DerivedTypeMappingBuilder.TryBuildMapping,
-        SpecialTypeMappingBuilder.TryBuildMapping,
+        ToObjectMappingBuilder.TryBuildMapping,
         DirectAssignmentMappingBuilder.TryBuildMapping,
         QueryableMappingBuilder.TryBuildMapping,
         DictionaryMappingBuilder.TryBuildMapping,
@@ -29,21 +32,34 @@ public class MappingBuilder
         DateTimeToTimeOnlyMappingBuilder.TryBuildMapping,
         ExplicitCastMappingBuilder.TryBuildMapping,
         ToStringMappingBuilder.TryBuildMapping,
-        NewInstanceObjectPropertyMappingBuilder.TryBuildMapping,
+        NewInstanceObjectMemberMappingBuilder.TryBuildMapping,
     };
 
-    private readonly MappingCollection _mappings;
-
-    public MappingBuilder(MappingCollection mappings)
-    {
-        _mappings = mappings;
-    }
-
     /// <inheritdoc cref="MappingCollection.UserMappings"/>
-    public IReadOnlyCollection<IUserMapping> UserMappings => _mappings.UserMappings;
+    public IReadOnlyCollection<IUserMapping> UserMappings => mappings.UserMappings;
 
-    /// <inheritdoc cref="MappingBuilderContext.FindMapping"/>
-    public INewInstanceMapping? Find(ITypeSymbol sourceType, ITypeSymbol targetType) => _mappings.Find(sourceType, targetType);
+    /// <inheritdoc cref="MappingCollection.NewInstanceMappings"/>
+    public IReadOnlyDictionary<TypeMappingKey, INewInstanceMapping> NewInstanceMappings => mappings.NewInstanceMappings;
+
+    public INewInstanceMapping? Find(TypeMappingKey mapping) => mappings.FindNewInstanceMapping(mapping);
+
+    public INewInstanceMapping? FindOrResolveNamed(SimpleMappingBuilderContext ctx, string name, out bool ambiguousName)
+    {
+        if (!ctx.Configuration.Mapper.AutoUserMappings && _resolvedMappingNames.Add(name))
+        {
+            // all user-defined mappings are already discovered
+            // resolve user-implemented mappings which were not discovered in the initialization discovery
+            // since no UserMappingAttribute was present
+            var namedMappings = UserMethodMappingExtractor.ExtractNamedUserImplementedNewInstanceMappings(
+                ctx,
+                mapperDeclaration.Symbol,
+                name
+            );
+            mappings.AddNamedNewInstanceUserMappings(name, namedMappings);
+        }
+
+        return mappings.FindNamedNewInstanceMapping(name, out ambiguousName);
+    }
 
     public INewInstanceMapping? Build(MappingBuilderContext ctx, bool resultIsReusable)
     {
@@ -54,10 +70,10 @@ public class MappingBuilder
 
             if (resultIsReusable)
             {
-                _mappings.AddNewInstanceMapping(mapping);
+                mappings.AddNewInstanceMapping(mapping, ctx.MappingKey.Configuration);
             }
 
-            _mappings.EnqueueToBuildBody(mapping, ctx);
+            mappings.EnqueueToBuildBody(mapping, ctx);
             return mapping;
         }
 

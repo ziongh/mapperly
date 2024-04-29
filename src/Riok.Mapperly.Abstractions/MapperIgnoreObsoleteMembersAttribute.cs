@@ -1,9 +1,12 @@
-﻿namespace Riok.Mapperly.Abstractions;
+using System.Diagnostics;
+
+namespace Riok.Mapperly.Abstractions;
 
 /// <summary>
 /// Specifies options for obsolete ignoring strategy.
 /// </summary>
 [AttributeUsage(AttributeTargets.Method)]
+[Conditional("MAPPERLY_ABSTRACTIONS_SCOPE_RUNTIME")]
 public sealed class MapperIgnoreObsoleteMembersAttribute : Attribute
 {
     /// <summary>

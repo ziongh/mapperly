@@ -41,14 +41,17 @@ public static class TestSourceBuilder
         return CSharp(
             $$"""
             using System;
+            using System.Linq;
             using System.Collections.Generic;
             using Riok.Mapperly.Abstractions;
             using Riok.Mapperly.Abstractions.ReferenceHandling;
 
-            {{(options.Namespace != null ? $"namespace {options.Namespace};" : string.Empty)}}
+            {{(options.Namespace != null ? $"namespace {options.Namespace};" : "")}}
 
             {{BuildAttribute(options)}}
-            public partial class {{options.MapperClassName}}
+            public {{(options.Static ? "static " : "")}}partial class {{options.MapperClassName}}{{(
+                options.MapperBaseClassName != null ? " : " + options.MapperBaseClassName : ""
+            )}}
             {
                 {{body}}
             }
@@ -91,6 +94,10 @@ public static class TestSourceBuilder
             Attribute(options.EnumMappingStrategy),
             Attribute(options.EnumMappingIgnoreCase),
             Attribute(options.IgnoreObsoleteMembersStrategy),
+            Attribute(options.RequiredMappingStrategy),
+            Attribute(options.IncludedMembers),
+            Attribute(options.PreferParameterlessConstructors),
+            Attribute(options.AutoUserMappings),
         }.WhereNotNull();
 
         return $"[Mapper({string.Join(", ", attrs)})]";

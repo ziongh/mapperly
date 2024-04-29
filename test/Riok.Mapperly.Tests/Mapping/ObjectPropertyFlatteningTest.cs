@@ -2,7 +2,6 @@ using Riok.Mapperly.Diagnostics;
 
 namespace Riok.Mapperly.Tests.Mapping;
 
-[UsesVerify]
 public class ObjectPropertyFlatteningTest
 {
     [Fact]
@@ -264,6 +263,10 @@ public class ObjectPropertyFlatteningTest
                 {
                     target.ValueId = source.Value.Id.ToString();
                 }
+                else
+                {
+                    target.ValueId = null;
+                }
                 target.ValueName = source.Value?.Name;
                 return target;
                 """
@@ -510,7 +513,7 @@ public class ObjectPropertyFlatteningTest
                 if (source.Value1 != null)
                 {
                     target.Value2 ??= new();
-                    if (source.Value1?.Value1 != null)
+                    if (source.Value1.Value1 != null)
                     {
                         target.Value2.Value2 ??= new();
                         target.Value2.Value2.Id2 = source.Value1.Value1.Id1;

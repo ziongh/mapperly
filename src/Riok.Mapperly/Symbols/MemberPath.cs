@@ -12,18 +12,12 @@ namespace Riok.Mapperly.Symbols;
 /// Eg. A.B.C
 /// </summary>
 [DebuggerDisplay("{FullName}")]
-public class MemberPath
+public class MemberPath(IReadOnlyList<IMappableMember> path)
 {
     private const string MemberAccessSeparator = ".";
-    private const string NullableValueProperty = "Value";
+    protected const string NullableValueProperty = "Value";
 
-    public MemberPath(IReadOnlyList<IMappableMember> path)
-    {
-        Path = path;
-        FullName = string.Join(MemberAccessSeparator, Path.Select(x => x.Name));
-    }
-
-    public IReadOnlyList<IMappableMember> Path { get; }
+    public IReadOnlyList<IMappableMember> Path { get; } = path;
 
     /// <summary>
     /// Gets the path without the very last element (the path of the object containing the <see cref="Member"/>).
@@ -33,7 +27,7 @@ public class MemberPath
     /// <summary>
     /// Gets the last part of the path or throws if there is none.
     /// </summary>
-    public IMappableMember Member => Path.Last();
+    public IMappableMember Member => Path[^1];
 
     /// <summary>
     /// Gets the type of the <see cref="Member"/>. If any part of the path is nullable, this type will be nullable too.
@@ -43,7 +37,7 @@ public class MemberPath
     /// <summary>
     /// Gets the full name of the path (eg. A.B.C).
     /// </summary>
-    public string FullName { get; }
+    public string FullName { get; } = string.Join(MemberAccessSeparator, path.Select(x => x.Name));
 
     /// <summary>
     /// Builds a member path skipping trailing path items which are non nullable.
@@ -73,41 +67,6 @@ public class MemberPath
 
     public bool IsAnyObjectPathNullable() => ObjectPath.Any(p => p.IsNullable);
 
-    public ExpressionSyntax BuildAccess(
-        ExpressionSyntax? baseAccess,
-        bool addValuePropertyOnNullable = false,
-        bool nullConditional = false,
-        bool skipTrailingNonNullable = false
-    )
-    {
-        var path = skipTrailingNonNullable ? PathWithoutTrailingNonNullable() : Path;
-
-        if (baseAccess == null)
-        {
-            baseAccess = IdentifierName(path.First().Name);
-            path = path.Skip(1);
-        }
-
-        if (nullConditional)
-        {
-            return path.AggregateWithPrevious(
-                baseAccess,
-                (expr, prevProp, prop) => prevProp?.IsNullable == true ? ConditionalAccess(expr, prop.Name) : MemberAccess(expr, prop.Name)
-            );
-        }
-
-        if (addValuePropertyOnNullable)
-        {
-            return path.Aggregate(
-                baseAccess,
-                (a, b) =>
-                    b.Type.IsNullableValueType() ? MemberAccess(MemberAccess(a, b.Name), NullableValueProperty) : MemberAccess(a, b.Name)
-            );
-        }
-
-        return path.Aggregate(baseAccess, (a, b) => MemberAccess(a, b.Name));
-    }
-
     /// <summary>
     /// Builds a condition (the resulting expression evaluates to a boolean)
     /// whether the path is non-null.
@@ -116,16 +75,16 @@ public class MemberPath
     /// <returns><c>null</c> if no part of the path is nullable or the condition which needs to be true, that the path cannot be <c>null</c>.</returns>
     public ExpressionSyntax? BuildNonNullConditionWithoutConditionalAccess(ExpressionSyntax? baseAccess)
     {
-        var path = PathWithoutTrailingNonNullable();
+        var nullablePath = PathWithoutTrailingNonNullable();
         ExpressionSyntax? condition = null;
         var access = baseAccess;
         if (access == null)
         {
-            access = IdentifierName(path.First().Name);
-            path = path.Skip(1);
+            access = IdentifierName(nullablePath.First().Name);
+            nullablePath = nullablePath.Skip(1);
         }
 
-        foreach (var pathPart in path)
+        foreach (var pathPart in nullablePath)
         {
             access = MemberAccess(access, pathPart.Name);
 

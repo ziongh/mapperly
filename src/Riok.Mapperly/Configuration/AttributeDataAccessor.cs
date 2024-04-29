@@ -8,28 +8,27 @@ namespace Riok.Mapperly.Configuration;
 /// <summary>
 /// Creates <see cref="Attribute"/> instances by resolving attribute data from provided symbols.
 /// </summary>
-public class AttributeDataAccessor
+public class AttributeDataAccessor(SymbolAccessor symbolAccessor)
 {
     private const string NameOfOperatorName = "nameof";
     private const char FullNameOfPrefix = '@';
 
-    private readonly SymbolAccessor _symbolAccessor;
-
-    public AttributeDataAccessor(SymbolAccessor symbolAccessor)
-    {
-        _symbolAccessor = symbolAccessor;
-    }
+    public TAttribute AccessSingle<TAttribute>(ISymbol symbol)
+        where TAttribute : Attribute => AccessSingle<TAttribute, TAttribute>(symbol);
 
     public TData AccessSingle<TAttribute, TData>(ISymbol symbol)
         where TAttribute : Attribute
         where TData : notnull => Access<TAttribute, TData>(symbol).Single();
+
+    public TAttribute? AccessFirstOrDefault<TAttribute>(ISymbol symbol)
+        where TAttribute : Attribute => Access<TAttribute, TAttribute>(symbol).FirstOrDefault();
 
     public TData? AccessFirstOrDefault<TAttribute, TData>(ISymbol symbol)
         where TAttribute : Attribute
         where TData : notnull => Access<TAttribute, TData>(symbol).FirstOrDefault();
 
     public bool HasAttribute<TAttribute>(ISymbol symbol)
-        where TAttribute : Attribute => _symbolAccessor.HasAttribute<TAttribute>(symbol);
+        where TAttribute : Attribute => symbolAccessor.HasAttribute<TAttribute>(symbol);
 
     public IEnumerable<TAttribute> Access<TAttribute>(ISymbol symbol)
         where TAttribute : Attribute => Access<TAttribute, TAttribute>(symbol);
@@ -49,7 +48,7 @@ public class AttributeDataAccessor
         where TAttribute : Attribute
         where TData : notnull
     {
-        var attrDatas = _symbolAccessor.GetAttributes<TAttribute>(symbol);
+        var attrDatas = symbolAccessor.GetAttributes<TAttribute>(symbol);
         foreach (var attrData in attrDatas)
         {
             yield return Access<TAttribute, TData>(attrData);
@@ -80,6 +79,11 @@ public class AttributeDataAccessor
             var value = BuildArgumentValue(namedArgument.Value, prop.PropertyType, syntaxArguments[syntaxIndex]);
             prop.SetValue(attr, value);
             syntaxIndex++;
+        }
+
+        if (attr is HasSyntaxReference symbolRefHolder)
+        {
+            symbolRefHolder.SyntaxReference = attrData.ApplicationSyntaxReference?.GetSyntax();
         }
 
         return attr;
@@ -157,7 +161,7 @@ public class AttributeDataAccessor
             {
                 var argMemberPath = argMemberPathStr
                     .TrimStart(FullNameOfPrefix)
-                    .Split(StringMemberPath.PropertyAccessSeparator)
+                    .Split(StringMemberPath.MemberAccessSeparator)
                     .Skip(1)
                     .ToArray();
                 return new StringMemberPath(argMemberPath);
@@ -166,7 +170,7 @@ public class AttributeDataAccessor
 
         if (arg is { Kind: TypedConstantKind.Primitive, Value: string v })
         {
-            return new StringMemberPath(v.Split(StringMemberPath.PropertyAccessSeparator));
+            return new StringMemberPath(v.Split(StringMemberPath.MemberAccessSeparator));
         }
 
         throw new InvalidOperationException($"Cannot create {nameof(StringMemberPath)} from {arg.Kind}");

@@ -4,6 +4,7 @@
   IntValue: 10,
   IntInitOnlyValue: 3,
   RequiredValue: 4,
+  UnmappedValue: 10,
   StringValue: fooBar,
   RenamedStringValue: fooBar2,
   Flattening: {
@@ -18,6 +19,12 @@
     IntValue: 100
   },
   NestedNullableTargetNotNullable: {},
+  NestedMember: {
+    NestedMemberId: 12,
+    NestedMemberObject: {
+      IntValue: 22
+    }
+  },
   StringNullableTargetNotNullable: fooBar3,
   TupleValue: {
     Item1: 10,
@@ -27,6 +34,7 @@
     CtorValue: 5,
     CtorValue2: 100,
     RequiredValue: 4,
+    UnmappedValue: 10,
     StringValue: ,
     RenamedStringValue: ,
     Flattening: {},
@@ -38,23 +46,32 @@
     ImmutableStackValue: [],
     EnumValue: Value10,
     EnumName: Value30,
-    EnumReverseStringValue: DtoValue3
+    EnumReverseStringValue: DtoValue3,
+    ExposePrivateValue: 16
   },
   SourceTargetSameObjectType: {
     CtorValue: 8,
     CtorValue2: 100,
     IntValue: 99,
     RequiredValue: 98,
+    UnmappedValue: 10,
     StringValue: ,
     RenamedStringValue: ,
     Flattening: {},
+    NestedMember: {
+      NestedMemberId: 123,
+      NestedMemberObject: {
+        IntValue: 223
+      }
+    },
     MemoryValue: {
       IsEmpty: true
     },
     ImmutableArrayValue: null,
     ImmutableQueueValue: [],
     ImmutableStackValue: [],
-    EnumReverseStringValue: 
+    EnumReverseStringValue: ,
+    ExposePrivateValue: 19
   },
   NullableReadOnlyObjectCollection: [
     {
@@ -158,6 +175,8 @@
     SubIntValue: 2,
     BaseIntValue: 1
   },
+  DateTimeValue: 2020-01-03 15:10:05 Utc,
   DateTimeValueTargetDateOnly: 2020-01-03 15:10:05 Utc,
-  DateTimeValueTargetTimeOnly: 2020-01-03 15:10:05 Utc
+  DateTimeValueTargetTimeOnly: 2020-01-03 15:10:05 Utc,
+  ExposePrivateValue: 18
 }

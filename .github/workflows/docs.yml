@@ -15,6 +15,11 @@ on:
         required: false
         type: string
         default: '0.0.1-dev'
+    secrets:
+      CLOUDFLARE_API_TOKEN:
+        required: false
+      CLOUDFLARE_ACCOUNT_ID:
+        required: false
   workflow_dispatch:
     inputs:
       deploy:
@@ -24,9 +29,12 @@ on:
         description: A boolean indicating whether the built pages should be deployed
       environment:
         required: false
-        type: string
+        type: choice
         default: 'next'
-        description: The github deployment which is targeted, gets prefixed by 'docs-', should be 'next' or 'stable'
+        options:
+          - next
+          - stable
+        description: The github deployment which is targeted, gets prefixed by 'docs-'
       version:
         required: false
         type: string
@@ -45,11 +53,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/configure-pages@v3
-      - uses: actions/setup-dotnet@v3
+      - uses: actions/setup-dotnet@v4
       - run: dotnet tool restore
       - run: dotnet build
-      - uses: actions/setup-node@v3
+      - uses: actions/setup-node@v4
         with:
           node-version-file: './docs/.node-version'
       - run: npm ci
@@ -61,7 +68,7 @@ jobs:
         env:
           MAPPERLY_VERSION: ${{ inputs.version }}
           ENVIRONMENT: ${{ inputs.environment }}
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4
         with:
           name: mapperly-docs
           path: 'docs/build'
@@ -80,7 +87,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: build
     steps:
-      - uses: actions/download-artifact@v3
+      - uses: actions/download-artifact@v4
         with:
           name: mapperly-docs
           path: 'docs/build'
@@ -91,6 +98,11 @@ jobs:
         with:
           _input-text: ${{ inputs.environment }}
           stable: main
+      # we never want to deploy with no version set
+      # stop the deployment here
+      - name: Version not set
+        if: ${{ inputs.version == '' || inputs.version == '0.0.1-dev' }}
+        run: exit 1
       - uses: cloudflare/pages-action@v1
         id: deployment
         with:

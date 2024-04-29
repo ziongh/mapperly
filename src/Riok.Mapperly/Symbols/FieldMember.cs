@@ -1,24 +1,23 @@
 using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
+using Riok.Mapperly.Descriptors;
 using Riok.Mapperly.Helpers;
+using static Riok.Mapperly.Emit.Syntax.SyntaxFactoryHelper;
 
 namespace Riok.Mapperly.Symbols;
 
-public class FieldMember : IMappableMember
+public class FieldMember(IFieldSymbol fieldSymbol, SymbolAccessor symbolAccessor) : IMappableMember
 {
-    private readonly IFieldSymbol _fieldSymbol;
-
-    public FieldMember(IFieldSymbol fieldSymbol)
-    {
-        _fieldSymbol = fieldSymbol;
-    }
+    private readonly IFieldSymbol _fieldSymbol = fieldSymbol;
 
     public string Name => _fieldSymbol.Name;
-    public ITypeSymbol Type => _fieldSymbol.Type;
+    public ITypeSymbol Type { get; } = symbolAccessor.UpgradeNullable(fieldSymbol.Type);
     public ISymbol MemberSymbol => _fieldSymbol;
-    public bool IsNullable => _fieldSymbol.NullableAnnotation == NullableAnnotation.Annotated || Type.IsNullable();
+    public bool IsNullable => Type.IsNullable();
     public bool IsIndexer => false;
-    public bool CanGet => !_fieldSymbol.IsReadOnly;
-    public bool CanSet => true;
+    public bool CanGet => true;
+    public bool CanSet => !_fieldSymbol.IsReadOnly;
+    public bool CanSetDirectly => true;
     public bool IsInitOnly => false;
 
     public bool IsRequired
@@ -27,6 +26,11 @@ public class FieldMember : IMappableMember
 #else
         => false;
 #endif
+
+    public ExpressionSyntax BuildAccess(ExpressionSyntax source, bool nullConditional = false)
+    {
+        return nullConditional ? ConditionalAccess(source, Name) : MemberAccess(source, Name);
+    }
 
     public override bool Equals(object? obj) =>
         obj is FieldMember other && SymbolEqualityComparer.IncludeNullability.Equals(_fieldSymbol, other._fieldSymbol);

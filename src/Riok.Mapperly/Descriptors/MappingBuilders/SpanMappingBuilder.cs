@@ -1,3 +1,4 @@
+using Microsoft.CodeAnalysis;
 using Riok.Mapperly.Abstractions;
 using Riok.Mapperly.Descriptors.Enumerables;
 using Riok.Mapperly.Descriptors.Enumerables.EnsureCapacity;
@@ -13,7 +14,7 @@ public static class SpanMappingBuilder
     private const string ToArrayMethodName = nameof(Enumerable.ToArray);
     private const string AddMethodName = nameof(ICollection<object>.Add);
 
-    public static NewInstanceMapping? TryBuildMapping(MappingBuilderContext ctx)
+    public static INewInstanceMapping? TryBuildMapping(MappingBuilderContext ctx)
     {
         if (!ctx.IsConversionEnabled(MappingConversionType.Span))
             return null;
@@ -46,7 +47,7 @@ public static class SpanMappingBuilder
             // if the source is Span/ReadOnlySpan or Array and target is Span/ReadOnlySpan
             // and element type is the same, then direct cast
             (CollectionType.Span or CollectionType.ReadOnlySpan or CollectionType.Array, CollectionType.Span or CollectionType.ReadOnlySpan)
-                when elementMapping.IsSynthetic && !ctx.MapperConfiguration.UseDeepCloning
+                when elementMapping.IsSynthetic && !ctx.Configuration.Mapper.UseDeepCloning
                 => new CastMapping(ctx.Source, ctx.Target),
 
             // otherwise map each value into an Array
@@ -115,7 +116,7 @@ public static class SpanMappingBuilder
         }
     }
 
-    private static NewInstanceMapping? BuildSpanToEnumerable(MappingBuilderContext ctx, INewInstanceMapping elementMapping)
+    private static INewInstanceMapping? BuildSpanToEnumerable(MappingBuilderContext ctx, INewInstanceMapping elementMapping)
     {
         var target = ctx.CollectionInfos!.Target;
 
@@ -129,7 +130,7 @@ public static class SpanMappingBuilder
 
         if (
             !ctx.ObjectFactories.TryFindObjectFactory(ctx.Source, ctx.Target, out var objectFactory)
-            && !ctx.SymbolAccessor.HasAccessibleParameterlessConstructor(ctx.Target)
+            && !ctx.SymbolAccessor.HasDirectlyAccessibleParameterlessConstructor(ctx.Target)
         )
         {
             return MapSpanArrayToEnumerableMethod(ctx);
@@ -156,7 +157,7 @@ public static class SpanMappingBuilder
         }
     }
 
-    private static NewInstanceMapping BuildToArrayOrMap(MappingBuilderContext ctx, INewInstanceMapping elementMapping)
+    private static INewInstanceMapping BuildToArrayOrMap(MappingBuilderContext ctx, INewInstanceMapping elementMapping)
     {
         if (!elementMapping.IsSynthetic)
             return new ArrayForMapping(ctx.Source, ctx.Target, elementMapping, elementMapping.TargetType);
@@ -175,7 +176,10 @@ public static class SpanMappingBuilder
 
     private static NewInstanceMapping? BuildSpanToList(MappingBuilderContext ctx, INewInstanceMapping elementMapping)
     {
-        var typedList = ctx.Types.Get(typeof(List<>)).Construct(elementMapping.TargetType);
+        var typedList = ctx
+            .Types.Get(typeof(List<>))
+            .Construct(elementMapping.TargetType)
+            .WithNullableAnnotation(NullableAnnotation.NotAnnotated);
         if (ctx.FindOrBuildMapping(ctx.Source, typedList) is not { } listMapping)
             return null;
 

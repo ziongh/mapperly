@@ -1,6 +1,6 @@
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
-using static Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
+using Riok.Mapperly.Helpers;
 using static Riok.Mapperly.Emit.Syntax.SyntaxFactoryHelper;
 
 namespace Riok.Mapperly.Descriptors.Mappings;
@@ -13,26 +13,18 @@ namespace Riok.Mapperly.Descriptors.Mappings;
 /// target = Map(source.ToArray());
 /// </code>
 /// </summary>
-public class SourceObjectMethodMapping : NewInstanceMapping
+public class SourceObjectMethodMapping(
+    ITypeSymbol sourceType,
+    ITypeSymbol targetType,
+    string methodName,
+    INewInstanceMapping? delegateMapping = null
+) : NewInstanceMapping(sourceType, targetType)
 {
-    private readonly string _methodName;
-    private readonly INewInstanceMapping? _delegateMapping;
-
-    public SourceObjectMethodMapping(
-        ITypeSymbol sourceType,
-        ITypeSymbol targetType,
-        string methodName,
-        INewInstanceMapping? delegateMapping = null
-    )
-        : base(sourceType, targetType)
-    {
-        _methodName = methodName;
-        this._delegateMapping = delegateMapping;
-    }
-
     public override ExpressionSyntax Build(TypeMappingBuildContext ctx)
     {
-        var sourceExpression = InvocationExpression(MemberAccess(ctx.Source, _methodName));
-        return _delegateMapping == null ? sourceExpression : _delegateMapping.Build(ctx.WithSource(sourceExpression));
+        var sourceExpression = Invocation(MemberAccess(ctx.Source, methodName), BuildArguments(ctx).WhereNotNull().ToArray());
+        return delegateMapping == null ? sourceExpression : delegateMapping.Build(ctx.WithSource(sourceExpression));
     }
+
+    protected virtual IEnumerable<ExpressionSyntax?> BuildArguments(TypeMappingBuildContext ctx) => Enumerable.Empty<ExpressionSyntax?>();
 }

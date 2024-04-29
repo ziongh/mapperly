@@ -1,16 +1,15 @@
-﻿using System.Collections.Immutable;
+using System.Collections.Immutable;
 using System.Diagnostics.CodeAnalysis;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
+using Riok.Mapperly.Abstractions;
 using Riok.Mapperly.Helpers;
 using Riok.Mapperly.Symbols;
 
 namespace Riok.Mapperly.Descriptors;
 
-public class SymbolAccessor
+public class SymbolAccessor(CompilationContext compilationContext, INamedTypeSymbol mapperSymbol)
 {
-    private readonly CompilationContext _compilationContext;
-    private readonly INamedTypeSymbol _mapperSymbol;
     private readonly Dictionary<ISymbol, ImmutableArray<AttributeData>> _attributes = new(SymbolEqualityComparer.Default);
     private readonly Dictionary<ITypeSymbol, IReadOnlyCollection<ISymbol>> _allMembers = new(SymbolEqualityComparer.Default);
     private readonly Dictionary<ITypeSymbol, IReadOnlyCollection<IMappableMember>> _allAccessibleMembers =
@@ -20,45 +19,110 @@ public class SymbolAccessor
     private readonly Dictionary<ITypeSymbol, IReadOnlyDictionary<string, IMappableMember>> _allAccessibleMembersCaseSensitive =
         new(SymbolEqualityComparer.Default);
 
-    public SymbolAccessor(CompilationContext compilationContext, INamedTypeSymbol mapperSymbol)
-    {
-        _compilationContext = compilationContext;
-        _mapperSymbol = mapperSymbol;
-    }
+    private MemberVisibility _memberVisibility = MemberVisibility.AllAccessible;
 
-    private Compilation Compilation => _compilationContext.Compilation;
+    private Compilation Compilation => compilationContext.Compilation;
 
-    public bool HasAccessibleParameterlessConstructor(ITypeSymbol symbol) =>
+    internal void SetMemberVisibility(MemberVisibility visibility) => _memberVisibility = visibility;
+
+    public bool HasDirectlyAccessibleParameterlessConstructor(ITypeSymbol symbol) =>
         symbol is INamedTypeSymbol { IsAbstract: false } namedTypeSymbol
-        && namedTypeSymbol.InstanceConstructors.Any(c => c.Parameters.IsDefaultOrEmpty && IsAccessible(c));
+        && namedTypeSymbol.InstanceConstructors.Any(c => c.Parameters.IsDefaultOrEmpty && IsDirectlyAccessible(c));
 
-    public bool IsAccessible(ISymbol symbol) => Compilation.IsSymbolAccessibleWithin(symbol, _mapperSymbol);
+    public bool IsDirectlyAccessible(ISymbol symbol) => Compilation.IsSymbolAccessibleWithin(symbol, mapperSymbol);
+
+    public bool IsAccessible(ISymbol symbol)
+    {
+        if (_memberVisibility.HasFlag(MemberVisibility.Accessible) && !IsDirectlyAccessible(symbol))
+            return false;
+
+        return symbol.DeclaredAccessibility switch
+        {
+            Accessibility.Private => _memberVisibility.HasFlag(MemberVisibility.Private),
+            Accessibility.ProtectedAndInternal
+                => _memberVisibility.HasFlag(MemberVisibility.Protected) && _memberVisibility.HasFlag(MemberVisibility.Internal),
+            Accessibility.Protected => _memberVisibility.HasFlag(MemberVisibility.Protected),
+            Accessibility.Internal => _memberVisibility.HasFlag(MemberVisibility.Internal),
+            Accessibility.ProtectedOrInternal
+                => _memberVisibility.HasFlag(MemberVisibility.Protected) || _memberVisibility.HasFlag(MemberVisibility.Internal),
+            Accessibility.Public => _memberVisibility.HasFlag(MemberVisibility.Public),
+            _ => false,
+        };
+    }
 
     public bool HasImplicitConversion(ITypeSymbol source, ITypeSymbol destination) =>
         Compilation.ClassifyConversion(source, destination).IsImplicit && (destination.IsNullable() || !source.IsNullable());
 
-    public bool DoesTypeSatisfyTypeParameterConstraints(
-        ITypeParameterSymbol typeParameter,
-        ITypeSymbol type,
-        NullableAnnotation typeParameterUsageNullableAnnotation
-    )
+    /// <summary>
+    /// Returns true when a conversion form the <paramref name="sourceType"/>
+    /// to the <paramref name="targetType"/> is possible with a conversion
+    /// of type identity, boxing or implicit and compatible nullability.
+    /// </summary>
+    /// <param name="sourceType">The source type.</param>
+    /// <param name="targetType">The target type.</param>
+    /// <returns>Whether the assignment is valid</returns>
+    public bool CanAssign(ITypeSymbol sourceType, ITypeSymbol targetType)
     {
-        if (typeParameter.HasConstructorConstraint && !HasAccessibleParameterlessConstructor(type))
-            return false;
+        var conversion = Compilation.ClassifyConversion(sourceType, targetType);
+        return (conversion.IsIdentity || conversion.IsBoxing || conversion.IsImplicit)
+            && (targetType.IsNullable() || !sourceType.IsNullable());
+    }
 
-        if (!typeParameter.IsNullable(typeParameterUsageNullableAnnotation) && type.IsNullable())
-            return false;
+    public MethodParameter? WrapOptionalMethodParameter(IParameterSymbol? symbol)
+    {
+        return symbol == null ? null : WrapMethodParameter(symbol);
+    }
 
-        if (typeParameter.HasValueTypeConstraint && !type.IsValueType)
-            return false;
+    public MethodParameter WrapMethodParameter(IParameterSymbol symbol) => new(symbol, UpgradeNullable(symbol.Type));
 
-        if (typeParameter.HasReferenceTypeConstraint && !type.IsReferenceType)
-            return false;
+    /// <summary>
+    /// Upgrade the nullability of a symbol from <see cref="NullableAnnotation.None"/> to <see cref="NullableAnnotation.Annotated"/>.
+    /// Does not upgrade the nullability of type parameters or array element types.
+    /// </summary>
+    /// <param name="symbol">The symbol to upgrade.</param>
+    /// <returns>The upgraded symbol</returns>
+    internal ITypeSymbol UpgradeNullable(ITypeSymbol symbol)
+    {
+        TryUpgradeNullable(symbol, out var upgradedSymbol);
+        return upgradedSymbol ?? symbol;
+    }
 
-        foreach (var constraintType in typeParameter.ConstraintTypes)
+    /// <summary>
+    /// Tries to upgrade the nullability of a symbol from <see cref="NullableAnnotation.None"/> to <see cref="NullableAnnotation.Annotated"/>.
+    /// Value types are not upgraded.
+    /// </summary>
+    /// <param name="symbol">The symbol.</param>
+    /// <param name="upgradedSymbol">The upgraded symbol, if an upgrade has taken place, <c>null</c> otherwise.</param>
+    /// <returns>Whether an upgrade has taken place.</returns>
+    internal bool TryUpgradeNullable(ITypeSymbol symbol, [NotNullWhen(true)] out ITypeSymbol? upgradedSymbol)
+    {
+        if (symbol.NullableAnnotation != NullableAnnotation.None || symbol.IsValueType)
         {
-            if (!Compilation.ClassifyConversion(type, constraintType.UpgradeNullable()).IsImplicit)
-                return false;
+            upgradedSymbol = default;
+            return false;
+        }
+
+        switch (symbol)
+        {
+            case INamedTypeSymbol { TypeArguments.Length: > 0 } namedSymbol:
+                var upgradedTypeArguments = namedSymbol.TypeArguments.Select(UpgradeNullable).ToImmutableArray();
+                upgradedSymbol = namedSymbol
+                    .ConstructedFrom.Construct(
+                        upgradedTypeArguments,
+                        upgradedTypeArguments.Select(ta => ta.NullableAnnotation).ToImmutableArray()
+                    )
+                    .WithNullableAnnotation(NullableAnnotation.Annotated);
+                break;
+
+            case IArrayTypeSymbol { ElementType.IsValueType: false, ElementNullableAnnotation: NullableAnnotation.None } arrayTypeSymbol:
+                upgradedSymbol = Compilation
+                    .CreateArrayTypeSymbol(UpgradeNullable(arrayTypeSymbol.ElementType), arrayTypeSymbol.Rank, NullableAnnotation.Annotated)
+                    .WithNullableAnnotation(NullableAnnotation.Annotated);
+                break;
+
+            default:
+                upgradedSymbol = symbol.WithNullableAnnotation(NullableAnnotation.Annotated);
+                break;
         }
 
         return true;
@@ -73,7 +137,7 @@ public class SymbolAccessor
             yield break;
         }
 
-        var attributeSymbol = _compilationContext.Types.Get<T>();
+        var attributeSymbol = compilationContext.Types.Get<T>();
         foreach (var attr in attributes)
         {
             if (SymbolEqualityComparer.Default.Equals(attr.AttributeClass?.ConstructedFrom ?? attr.AttributeClass, attributeSymbol))
@@ -138,12 +202,18 @@ public class SymbolAccessor
         [NotNullWhen(true)] out MemberPath? memberPath
     )
     {
-        foreach (var pathCandidate in FindMemberPathCandidates(type, pathCandidates, ignoreCase))
+        var foundPath = new List<IMappableMember>();
+        foreach (var pathCandidate in pathCandidates)
         {
-            if (ignoredNames.Contains(pathCandidate.Path.First().Name))
+            // reuse List instead of allocating a new one
+            foundPath.Clear();
+            if (!TryFindPath(type, pathCandidate, ignoreCase, foundPath))
                 continue;
 
-            memberPath = pathCandidate;
+            if (ignoredNames.Contains(foundPath[0].Name))
+                continue;
+
+            memberPath = new(foundPath);
             return true;
         }
 
@@ -151,52 +221,33 @@ public class SymbolAccessor
         return false;
     }
 
-    internal bool TryFindMemberPath(ITypeSymbol type, IReadOnlyCollection<string> path, [NotNullWhen(true)] out MemberPath? memberPath) =>
-        TryFindMemberPath(type, path, false, out memberPath);
-
-    private IEnumerable<MemberPath> FindMemberPathCandidates(
-        ITypeSymbol type,
-        IEnumerable<IEnumerable<string>> pathCandidates,
-        bool ignoreCase
-    )
+    internal bool TryFindMemberPath(ITypeSymbol type, IReadOnlyCollection<string> path, [NotNullWhen(true)] out MemberPath? memberPath)
     {
-        foreach (var pathCandidate in pathCandidates)
+        var foundPath = new List<IMappableMember>();
+        if (TryFindPath(type, path, false, foundPath))
         {
-            if (TryFindMemberPath(type, pathCandidate.ToList(), ignoreCase, out var memberPath))
-                yield return memberPath;
-        }
-    }
-
-    private bool TryFindMemberPath(
-        ITypeSymbol type,
-        IReadOnlyCollection<string> path,
-        bool ignoreCase,
-        [NotNullWhen(true)] out MemberPath? memberPath
-    )
-    {
-        var foundPath = FindMemberPath(type, path, ignoreCase).ToList();
-        if (foundPath.Count != path.Count)
-        {
-            memberPath = null;
-            return false;
+            memberPath = new(foundPath);
+            return true;
         }
 
-        memberPath = new(foundPath);
-        return true;
+        memberPath = null;
+        return false;
     }
 
-    private IEnumerable<IMappableMember> FindMemberPath(ITypeSymbol type, IEnumerable<string> path, bool ignoreCase)
+    private bool TryFindPath(ITypeSymbol type, IEnumerable<string> path, bool ignoreCase, ICollection<IMappableMember> foundPath)
     {
         foreach (var name in path)
         {
             // get T if type is Nullable<T>, prevents Value being treated as a member
             var actualType = type.NonNullableValueType() ?? type;
             if (GetMappableMember(actualType, name, ignoreCase) is not { } member)
-                break;
+                return false;
 
             type = member.Type;
-            yield return member;
+            foundPath.Add(member);
         }
+
+        return true;
     }
 
     private IMappableMember? GetMappableMember(ITypeSymbol symbol, string name, bool ignoreCase)

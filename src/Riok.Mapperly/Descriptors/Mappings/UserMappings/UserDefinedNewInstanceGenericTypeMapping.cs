@@ -1,6 +1,9 @@
 using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Riok.Mapperly.Emit;
+using Riok.Mapperly.Emit.Syntax;
+using Riok.Mapperly.Helpers;
 using Riok.Mapperly.Symbols;
 using static Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
 using static Riok.Mapperly.Emit.Syntax.SyntaxFactoryHelper;
@@ -13,31 +16,82 @@ namespace Riok.Mapperly.Descriptors.Mappings.UserMappings;
 /// a generic target parameter or both.
 /// Similar to <see cref="UserDefinedNewInstanceRuntimeTargetTypeParameterMapping"/>.
 /// </summary>
-public class UserDefinedNewInstanceGenericTypeMapping : UserDefinedNewInstanceRuntimeTargetTypeMapping
-{
-    public UserDefinedNewInstanceGenericTypeMapping(
-        IMethodSymbol method,
-        GenericMappingTypeParameters typeParameters,
-        MappingMethodParameters parameters,
-        bool enableReferenceHandling,
-        NullFallbackValue nullArm,
-        ITypeSymbol objectType
+public class UserDefinedNewInstanceGenericTypeMapping(
+    IMethodSymbol method,
+    MappingMethodParameters parameters,
+    ITypeSymbol targetType,
+    bool enableReferenceHandling,
+    NullFallbackValue? nullArm,
+    ITypeSymbol objectType
+)
+    : UserDefinedNewInstanceRuntimeTargetTypeMapping(
+        method,
+        parameters.Source,
+        parameters.ReferenceHandler,
+        targetType,
+        enableReferenceHandling,
+        nullArm,
+        objectType
     )
-        : base(method, parameters.Source, parameters.ReferenceHandler, enableReferenceHandling, nullArm, objectType)
+{
+    public override MethodDeclarationSyntax BuildMethod(SourceEmitterContext ctx)
     {
-        TypeParameters = typeParameters;
+        var methodSyntax = (MethodDeclarationSyntax)Method.DeclaringSyntaxReferences.First().GetSyntax();
+        return base.BuildMethod(ctx)
+            .WithTypeParameterList(methodSyntax.TypeParameterList)
+            .WithConstraintClauses(List(GetTypeParameterConstraintClauses()));
     }
-
-    public GenericMappingTypeParameters TypeParameters { get; }
-
-    public override MethodDeclarationSyntax BuildMethod(SourceEmitterContext ctx) =>
-        base.BuildMethod(ctx).WithTypeParameterList(TypeParameterList(TypeParameters.SourceType, TypeParameters.TargetType));
 
     protected override ExpressionSyntax BuildTargetType()
     {
-        // typeof(TTarget) or typeof(<ReturnType>)
-        var targetTypeName = TypeParameters.TargetType ?? TargetType;
-        return TypeOfExpression(FullyQualifiedIdentifier(targetTypeName));
+        // typeof(<ReturnType>)
+        return TypeOfExpression(FullyQualifiedIdentifier(Method.ReturnType.NonNullable()));
+    }
+
+    protected virtual IEnumerable<TypeParameterConstraintClauseSyntax> GetTypeParameterConstraintClauses()
+    {
+        foreach (var tp in Method.TypeParameters)
+        {
+            var constraints = new List<TypeParameterConstraintSyntax>();
+
+            if (tp.HasUnmanagedTypeConstraint)
+            {
+                constraints.Add(TypeConstraint(IdentifierName("unmanaged")).AddLeadingSpace());
+            }
+            else if (tp.HasValueTypeConstraint)
+            {
+                constraints.Add(ClassOrStructConstraint(SyntaxKind.StructConstraint).AddLeadingSpace());
+            }
+            else if (tp.HasNotNullConstraint)
+            {
+                constraints.Add(TypeConstraint(IdentifierName("notnull")).AddLeadingSpace());
+            }
+            else if (tp.HasReferenceTypeConstraint)
+            {
+                constraints.Add(ClassOrStructConstraint(SyntaxKind.ClassConstraint).AddLeadingSpace());
+            }
+
+            foreach (var c in tp.ConstraintTypes)
+            {
+                constraints.Add(TypeConstraint(FullyQualifiedIdentifier(c)).AddLeadingSpace());
+            }
+
+            if (tp.HasConstructorConstraint)
+            {
+                constraints.Add(ConstructorConstraint().AddLeadingSpace());
+            }
+
+            if (!constraints.Any())
+            {
+                continue;
+            }
+
+            yield return TypeParameterConstraintClause(
+                    IdentifierName(tp.Name).AddLeadingSpace().AddTrailingSpace(),
+                    SeparatedList(constraints)
+                )
+                .AddLeadingSpace();
+        }
     }
 
     protected override ExpressionSyntax? BuildSwitchArmWhenClause(ExpressionSyntax targetType, RuntimeTargetTypeMapping mapping)

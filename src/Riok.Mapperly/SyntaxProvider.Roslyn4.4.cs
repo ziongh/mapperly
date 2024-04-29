@@ -1,4 +1,4 @@
-﻿#if ROSLYN4_4_OR_GREATER
+#if ROSLYN4_4_OR_GREATER
 
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -10,8 +10,8 @@ internal static class SyntaxProvider
 {
     public static IncrementalValuesProvider<MapperDeclaration> GetMapperDeclarations(IncrementalGeneratorInitializationContext context)
     {
-        return context.SyntaxProvider
-            .ForAttributeWithMetadataName(
+        return context
+            .SyntaxProvider.ForAttributeWithMetadataName(
                 MapperGenerator.MapperAttributeName,
                 static (s, _) => s is ClassDeclarationSyntax,
                 static (ctx, _) => (ctx.TargetSymbol, TargetNode: (ClassDeclarationSyntax)ctx.TargetNode)
@@ -22,8 +22,8 @@ internal static class SyntaxProvider
 
     public static IncrementalValueProvider<IAssemblySymbol?> GetMapperDefaultDeclarations(IncrementalGeneratorInitializationContext context)
     {
-        return context.SyntaxProvider
-            .ForAttributeWithMetadataName(
+        return context
+            .SyntaxProvider.ForAttributeWithMetadataName(
                 MapperGenerator.MapperDefaultsAttributeName,
                 static (s, _) => s is CompilationUnitSyntax,
                 static (ctx, _) => (IAssemblySymbol)ctx.TargetSymbol

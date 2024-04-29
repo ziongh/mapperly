@@ -19,6 +19,8 @@
     IntValue: 100
   },
   NestedNullableTargetNotNullable: {},
+  NestedMemberId: 12,
+  NestedMemberObjectIntValue: 22,
   StringNullableTargetNotNullable: fooBar3,
   TupleValue: {
     Item1: 10,
@@ -47,20 +49,31 @@
     EnumValue: DtoValue1,
     EnumName: Value30,
     EnumStringValue: 0,
-    EnumReverseStringValue: DtoValue3
+    EnumReverseStringValue: DtoValue3,
+    FormattedIntValue: CHF 0.00,
+    FormattedDateValue: Monday, January 1, 0001,
+    ExposePrivateValue: 26
   },
   SourceTargetSameObjectType: {
     CtorValue: 8,
     CtorValue2: 100,
     IntValue: 99,
     RequiredValue: 98,
+    UnmappedValue: 10,
     StringValue: ,
     RenamedStringValue: ,
     Flattening: {},
+    NestedMember: {
+      NestedMemberId: 123,
+      NestedMemberObject: {
+        IntValue: 223
+      }
+    },
     ImmutableArrayValue: null,
     ImmutableQueueValue: [],
     ImmutableStackValue: [],
-    EnumReverseStringValue: 
+    EnumReverseStringValue: ,
+    ExposePrivateValue: 19
   },
   NullableReadOnlyObjectCollection: [
     {
@@ -175,5 +188,8 @@
     BaseIntValue: 1
   },
   DateTimeValueTargetDateOnly: 2020-01-03,
-  DateTimeValueTargetTimeOnly: 3:10 PM
+  DateTimeValueTargetTimeOnly: 3:10 PM,
+  FormattedIntValue: CHF 10.00,
+  FormattedDateValue: Friday, January 3, 2020,
+  ExposePrivateValue: 28
 }

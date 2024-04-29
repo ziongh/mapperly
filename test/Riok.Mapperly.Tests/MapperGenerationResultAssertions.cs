@@ -26,7 +26,7 @@ public class MapperGenerationResultAssertions
         return this;
     }
 
-    public MapperGenerationResultAssertions NotHaveDiagnostics(IReadOnlySet<DiagnosticSeverity> allowedDiagnosticSeverities)
+    public MapperGenerationResultAssertions OnlyHaveDiagnosticSeverities(IReadOnlySet<DiagnosticSeverity> allowedDiagnosticSeverities)
     {
         _mapper.Diagnostics.FirstOrDefault(d => !allowedDiagnosticSeverities.Contains(d.Severity)).Should().BeNull();
         return this;
@@ -84,7 +84,7 @@ public class MapperGenerationResultAssertions
         return this;
     }
 
-    public MapperGenerationResultAssertions AllMethodsHaveBody(string mapperMethodBody)
+    public MapperGenerationResultAssertions AllMethodsHaveBody([StringSyntax(LanguageNames.CSharp)] string mapperMethodBody)
     {
         mapperMethodBody = mapperMethodBody.ReplaceLineEndings().Trim();
         foreach (var method in _mapper.Methods.Values)
@@ -120,6 +120,19 @@ public class MapperGenerationResultAssertions
 
     public MapperGenerationResultAssertions HaveMapMethodBody([StringSyntax(StringSyntax.CSharp)] string mapperMethodBody) =>
         HaveMethodBody(TestSourceBuilder.DefaultMapMethodName, mapperMethodBody);
+
+    public MapperGenerationResultAssertions HaveMapMethodWithGenericConstraints(
+        string methodName,
+        [StringSyntax(StringSyntax.CSharp)] string? constraintClauses
+    )
+    {
+        _mapper.Methods[methodName].ConstraintClauses.Should().Be(constraintClauses);
+        return this;
+    }
+
+    public MapperGenerationResultAssertions HaveMapMethodWithGenericConstraints(
+        [StringSyntax(StringSyntax.CSharp)] string? constraintClauses
+    ) => HaveMapMethodWithGenericConstraints(TestSourceBuilder.DefaultMapMethodName, constraintClauses);
 
     private IReadOnlyCollection<Diagnostic> GetDiagnostics(DiagnosticDescriptor descriptor)
     {

@@ -1,6 +1,5 @@
 namespace Riok.Mapperly.Tests.Mapping;
 
-[UsesVerify]
 public class QueryableProjectionNullableTest
 {
     [Fact]
@@ -132,13 +131,38 @@ public class QueryableProjectionNullableTest
     {
         var source = TestSourceBuilder.MapperWithBodyAndTypes(
             """
-                public partial System.Linq.IQueryable<B> Map(System.Linq.IQueryable<A> q);
-                [MapProperty("Nested.Nested2.Value3", "NestedValue4")] private partial B Map(A source);
-                """,
+            public partial System.Linq.IQueryable<B> Map(System.Linq.IQueryable<A> q);
+            [MapProperty("Nested.Nested2.Value3", "NestedValue4")] private partial B Map(A source);
+            """,
             "class A { public C? Nested { get; set; } }",
             "class B { public int NestedValue4 { get; set; } }",
             "class C { public D? Nested2 { get; set; } }",
             "class D { public int Value3 { get; set; }}"
+        );
+
+        return TestHelper.VerifyGenerator(source);
+    }
+
+    [Fact]
+    public Task ClassToRecordNoAccessibleSourceCtorShouldNotDiagnostic()
+    {
+        // see https://github.com/riok/mapperly/issues/972
+        var source = TestSourceBuilder.Mapping(
+            "System.Linq.IQueryable<A>",
+            "System.Linq.IQueryable<B>",
+            """
+            public class A
+            {
+                private A(C value)
+                {
+                    Value = value;
+                }
+
+                public C Value { get; }
+            }
+            """,
+            "public record B(C Value);",
+            "public record C(string StringValue);"
         );
 
         return TestHelper.VerifyGenerator(source);

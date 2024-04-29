@@ -2,14 +2,16 @@ using Riok.Mapperly.Diagnostics;
 
 namespace Riok.Mapperly.Tests.Mapping;
 
-[UsesVerify]
 public class ObjectFactoryTest
 {
     [Fact]
     public void ShouldUseSimpleObjectFactory()
     {
         var source = TestSourceBuilder.MapperWithBodyAndTypes(
-            "[ObjectFactory] B CreateB() => new B();" + "partial B Map(A a);",
+            """
+            [ObjectFactory] B CreateB() => new B();
+            partial B Map(A a);
+            """,
             "class A { public string StringValue { get; set; } }",
             "class B { public string StringValue { get; set; } }"
         );
@@ -30,7 +32,11 @@ public class ObjectFactoryTest
     public void ShouldUseSimpleObjectFactoryForMultipleMaps()
     {
         var source = TestSourceBuilder.MapperWithBodyAndTypes(
-            "[ObjectFactory] B CreateB() => new B();" + "partial B Map(A a);" + "partial B Map2(A a);",
+            """
+            [ObjectFactory] B CreateB() => new B();
+            partial B Map(A a);
+            partial B Map2(A a);
+            """,
             "class A { public string StringValue { get; set; } }",
             "class B { public string StringValue { get; set; } }"
         );
@@ -52,8 +58,13 @@ public class ObjectFactoryTest
     public void ShouldUseSimpleObjectFactoryWithSource()
     {
         var source = TestSourceBuilder.MapperWithBodyAndTypes(
-            "[ObjectFactory] B CreateB(A source) => new B(source.IntValue);"
-                + "[MapperIgnoreSource(nameof(A.IntValue))] partial B Map(A a);",
+            """
+            [ObjectFactory]
+            B CreateB(A source) => new B(source.IntValue);
+
+            [MapperIgnoreSource(nameof(A.IntValue))]
+            partial B Map(A a);
+            """,
             "class A { public int IntValue { get; set; } public string StringValue { get; set; } }",
             "class B { private readonly int _intValue; public B(int v) => _intValue = v; public string StringValue { get; set; } }"
         );
@@ -74,7 +85,10 @@ public class ObjectFactoryTest
     public void ShouldUseGenericTargetObjectFactory()
     {
         var source = TestSourceBuilder.MapperWithBodyAndTypes(
-            "[ObjectFactory] T Create<T>() where T : new() => new T();" + "partial B Map(A a);",
+            """
+            [ObjectFactory] T Create<T>() where T : new() => new T();
+            partial B Map(A a);
+            """,
             "class A { public string StringValue { get; set; } }",
             "class B { public string StringValue { get; set; } }"
         );
@@ -95,7 +109,10 @@ public class ObjectFactoryTest
     public void ShouldUseGenericTargetObjectFactoryWithSource()
     {
         var source = TestSourceBuilder.MapperWithBodyAndTypes(
-            "[ObjectFactory] T Create<T>(A source) where T : new() => new T();" + "partial B Map(A a);",
+            """
+            [ObjectFactory] T Create<T>(A source) where T : new() => new T();
+            partial B Map(A a);
+            """,
             "class A { public string StringValue { get; set; } }",
             "class B { public string StringValue { get; set; } }"
         );
@@ -116,7 +133,10 @@ public class ObjectFactoryTest
     public void ShouldUseGenericSourceTargetObjectFactoryTargetFirst()
     {
         var source = TestSourceBuilder.MapperWithBodyAndTypes(
-            "[ObjectFactory] T Create<T, S>(S source) where T : new() => new T();" + "partial B Map(A a);",
+            """
+            [ObjectFactory] T Create<T, S>(S source) where T : new() => new T();
+            partial B Map(A a);
+            """,
             "class A { public string StringValue { get; set; } }",
             "class B { public string StringValue { get; set; } }"
         );
@@ -137,7 +157,10 @@ public class ObjectFactoryTest
     public void ShouldUseGenericSourceTargetObjectFactorySourceFirst()
     {
         var source = TestSourceBuilder.MapperWithBodyAndTypes(
-            "[ObjectFactory] T Create<S, T>(S source) where T : new() => new T();" + "partial B Map(A a);",
+            """
+            [ObjectFactory] T Create<S, T>(S source) where T : new() => new T();
+            partial B Map(A a);
+            """,
             "class A { public string StringValue { get; set; } }",
             "class B { public string StringValue { get; set; } }"
         );
@@ -158,7 +181,10 @@ public class ObjectFactoryTest
     public void ShouldUseGenericSourceObjectFactory()
     {
         var source = TestSourceBuilder.MapperWithBodyAndTypes(
-            "[ObjectFactory] B Create<S>(S source) => new B();" + "partial B Map(A a);",
+            """
+            [ObjectFactory] B Create<S>(S source) => new B();
+            partial B Map(A a);
+            """,
             "class A { public string StringValue { get; set; } }",
             "class B { public string StringValue { get; set; } }"
         );
@@ -203,10 +229,13 @@ public class ObjectFactoryTest
     public void ShouldUseGenericObjectFactoryWithTypeConstraint()
     {
         var source = TestSourceBuilder.MapperWithBodyAndTypes(
-            "[ObjectFactory] private T CreateA<T>() where T : new(), A => new T();"
-                + "[ObjectFactory] private T CreateStruct<T>() where T : new(), struct => new T();"
-                + "[ObjectFactory] private T CreateB<T>() where T : new(), B => new T();"
-                + "partial B Map(A a);",
+            """
+            [ObjectFactory] private T CreateA<T>() where T : new(), A => new T();
+            [ObjectFactory] private T CreateStruct<T>() where T : new(), struct => new T();
+            [ObjectFactory] private T CreateB<T>() where T : new(), B => new T();
+
+            partial B Map(A a);
+            """,
             "class A { public string StringValue { get; set; } }",
             "class B { public string StringValue { get; set; } }"
         );
@@ -227,7 +256,10 @@ public class ObjectFactoryTest
     public void ShouldUseSimpleObjectFactoryIfTypeIsNullable()
     {
         var source = TestSourceBuilder.MapperWithBodyAndTypes(
-            "[ObjectFactory] B CreateB() => new B();" + "partial B Map(A a);",
+            """
+            [ObjectFactory] B CreateB() => new B();
+            partial B Map(A a);
+            """,
             "class A { public string StringValue { get; set; } }",
             "#nullable disable\nclass B { public string StringValue { get; set; } }\n#nullable restore"
         );
@@ -248,7 +280,10 @@ public class ObjectFactoryTest
     public void ShouldUseSimpleObjectFactoryAndCreateObjectIfNullIsReturned()
     {
         var source = TestSourceBuilder.MapperWithBodyAndTypes(
-            "[ObjectFactory] B? CreateB() => null;" + "partial B Map(A a);",
+            """
+            [ObjectFactory] B? CreateB() => null;
+            partial B Map(A a);
+            """,
             "class A { public string StringValue { get; set; } }",
             "class B { public string StringValue { get; set; } }"
         );
@@ -269,7 +304,10 @@ public class ObjectFactoryTest
     public void ShouldUseSimpleObjectFactoryAndThrowIfNoParameterlessCtor()
     {
         var source = TestSourceBuilder.MapperWithBodyAndTypes(
-            "[ObjectFactory] B? CreateB() => null;" + "partial B Map(A a);",
+            """
+            [ObjectFactory] B? CreateB() => null;
+            partial B Map(A a);
+            """,
             "class A { public string StringValue { get; set; } }",
             "class B { private B() {} public string StringValue { get; set; } }"
         );
@@ -290,7 +328,10 @@ public class ObjectFactoryTest
     public void ShouldUseGenericObjectFactoryAndCreateObjectIfNullIsReturned()
     {
         var source = TestSourceBuilder.MapperWithBodyAndTypes(
-            "[ObjectFactory] T? Create<T>() where T : notnull => null;" + "partial B Map(A a);",
+            """
+            [ObjectFactory] T? Create<T>() where T : notnull => null;
+            partial B Map(A a);
+            """,
             "class A { public string StringValue { get; set; } }",
             "class B { public string StringValue { get; set; } }"
         );
@@ -311,7 +352,10 @@ public class ObjectFactoryTest
     public void ShouldUseGenericObjectFactoryAndThrowIfNoParameterlessCtor()
     {
         var source = TestSourceBuilder.MapperWithBodyAndTypes(
-            "[ObjectFactory] T? Create<T>() where T : notnull => null;" + "partial B Map(A a);",
+            """
+            [ObjectFactory] T? Create<T>() where T : notnull => null;
+            partial B Map(A a);
+            """,
             "class A { public string StringValue { get; set; } }",
             "class B { private B() {} public string StringValue { get; set; } }"
         );
@@ -329,16 +373,48 @@ public class ObjectFactoryTest
     }
 
     [Fact]
+    public void ShouldUseObjectFactoryWithRecursiveTypeParameter()
+    {
+        var source = TestSourceBuilder.MapperWithBodyAndTypes(
+            """
+            [ObjectFactory]
+            private B Create<TSource>(TSource source)
+                where TSource : Base<TSource>
+                => new B();
+
+            partial B Map(A source);
+            """,
+            "class Base<T>;",
+            "class A : Base<A> { public string StringValue { get; set; } }",
+            "class B { private B() {} public string StringValue { get; set; } }"
+        );
+
+        TestHelper
+            .GenerateMapper(source)
+            .Should()
+            .HaveSingleMethodBody(
+                """
+                var target = Create<global::A>(source);
+                target.StringValue = source.StringValue;
+                return target;
+                """
+            );
+    }
+
+    [Fact]
     public void InvalidSignatureAsync()
     {
         var source = TestSourceBuilder.MapperWithBodyAndTypes(
-            "[ObjectFactory] async Task<T> Create<T>() where T : new() => Task.FromResult(new T());" + "partial B Map(A a);",
+            """
+            [ObjectFactory] async Task<T> Create<T>() where T : new() => Task.FromResult(new T());
+            partial B Map(A a);
+            """,
             "class A { public string StringValue { get; set; } }",
             "class B { public string StringValue { get; set; } }"
         );
 
         TestHelper
-            .GenerateMapper(source, TestHelperOptions.AllowAllDiagnostics)
+            .GenerateMapper(source, TestHelperOptions.AllowDiagnostics)
             .Should()
             .HaveDiagnostic(DiagnosticDescriptors.InvalidObjectFactorySignature)
             .HaveAssertedAllDiagnostics();
@@ -348,13 +424,16 @@ public class ObjectFactoryTest
     public void InvalidSignatureParameters()
     {
         var source = TestSourceBuilder.MapperWithBodyAndTypes(
-            "[ObjectFactory] B CreateB(int i, int j) => new B();" + "partial B Map(A a);",
+            """
+            [ObjectFactory] B CreateB(int i, int j) => new B();
+            partial B Map(A a);
+            """,
             "class A { public string StringValue { get; set; } }",
             "class B { public string StringValue { get; set; } }"
         );
 
         TestHelper
-            .GenerateMapper(source, TestHelperOptions.AllowAllDiagnostics)
+            .GenerateMapper(source, TestHelperOptions.AllowDiagnostics)
             .Should()
             .HaveDiagnostic(DiagnosticDescriptors.InvalidObjectFactorySignature)
             .HaveAssertedAllDiagnostics();
@@ -364,13 +443,16 @@ public class ObjectFactoryTest
     public void InvalidSignatureVoid()
     {
         var source = TestSourceBuilder.MapperWithBodyAndTypes(
-            "[ObjectFactory] void CreateB() => 0" + "partial B Map(A a);",
+            """
+            [ObjectFactory] void CreateB() {}
+            partial B Map(A a);
+            """,
             "class A { public string StringValue { get; set; } }",
             "class B { public string StringValue { get; set; } }"
         );
 
         TestHelper
-            .GenerateMapper(source, TestHelperOptions.AllowAllDiagnostics)
+            .GenerateMapper(source, TestHelperOptions.AllowDiagnostics)
             .Should()
             .HaveDiagnostic(DiagnosticDescriptors.InvalidObjectFactorySignature)
             .HaveAssertedAllDiagnostics();
@@ -380,13 +462,16 @@ public class ObjectFactoryTest
     public void InvalidSignatureMultipleTypeParameters()
     {
         var source = TestSourceBuilder.MapperWithBodyAndTypes(
-            "[ObjectFactory] T Create<T, T2>() where T : new() => new T();" + "partial B Map(A a);",
+            """
+            [ObjectFactory] T Create<T, T2>() where T : new() => new T();
+            partial B Map(A a);
+            """,
             "class A { public string StringValue { get; set; } }",
             "class B { public string StringValue { get; set; } }"
         );
 
         TestHelper
-            .GenerateMapper(source, TestHelperOptions.AllowAllDiagnostics)
+            .GenerateMapper(source, TestHelperOptions.AllowDiagnostics)
             .Should()
             .HaveDiagnostic(DiagnosticDescriptors.InvalidObjectFactorySignature)
             .HaveAssertedAllDiagnostics();
@@ -396,13 +481,16 @@ public class ObjectFactoryTest
     public void InvalidSignatureTypeParameterNotReturnType()
     {
         var source = TestSourceBuilder.MapperWithBodyAndTypes(
-            "[ObjectFactory] B CreateB<T>() => new B();" + "partial B Map(A a);",
+            """
+            [ObjectFactory] B CreateB<T>() => new B();
+            partial B Map(A a);
+            """,
             "class A { public string StringValue { get; set; } }",
             "class B { public string StringValue { get; set; } }"
         );
 
         TestHelper
-            .GenerateMapper(source, TestHelperOptions.AllowAllDiagnostics)
+            .GenerateMapper(source, TestHelperOptions.AllowDiagnostics)
             .Should()
             .HaveDiagnostic(DiagnosticDescriptors.InvalidObjectFactorySignature)
             .HaveAssertedAllDiagnostics();
@@ -412,13 +500,16 @@ public class ObjectFactoryTest
     public void InvalidSignatureTooManyTypeParameters()
     {
         var source = TestSourceBuilder.MapperWithBodyAndTypes(
-            "[ObjectFactory] T CreateB<S, T, T2>(S source) where T : new() => new T();" + "partial B Map(A a);",
+            """
+            [ObjectFactory] T CreateB<S, T, T2>(S source) where T : new() => new T();
+            partial B Map(A a);
+            """,
             "class A { public string StringValue { get; set; } }",
             "class B { public string StringValue { get; set; } }"
         );
 
         TestHelper
-            .GenerateMapper(source, TestHelperOptions.AllowAllDiagnostics)
+            .GenerateMapper(source, TestHelperOptions.AllowDiagnostics)
             .Should()
             .HaveDiagnostic(DiagnosticDescriptors.InvalidObjectFactorySignature)
             .HaveAssertedAllDiagnostics();
@@ -428,13 +519,16 @@ public class ObjectFactoryTest
     public void InvalidSignatureTooManyTypeParametersSourceNotTypeParameter()
     {
         var source = TestSourceBuilder.MapperWithBodyAndTypes(
-            "[ObjectFactory] T CreateB<S, T>(A source) where T : new() => new T();" + "partial B Map(A a);",
+            """
+            [ObjectFactory] T CreateB<S, T>(A source) where T : new() => new T();
+            partial B Map(A a);
+            """,
             "class A { public string StringValue { get; set; } }",
             "class B { public string StringValue { get; set; } }"
         );
 
         TestHelper
-            .GenerateMapper(source, TestHelperOptions.AllowAllDiagnostics)
+            .GenerateMapper(source, TestHelperOptions.AllowDiagnostics)
             .Should()
             .HaveDiagnostic(DiagnosticDescriptors.InvalidObjectFactorySignature)
             .HaveAssertedAllDiagnostics();
@@ -444,29 +538,16 @@ public class ObjectFactoryTest
     public void InvalidSignatureTooManyTypeParametersTargetNotTypeParameter()
     {
         var source = TestSourceBuilder.MapperWithBodyAndTypes(
-            "[ObjectFactory] B CreateB<S, T>(S source) => new B();" + "partial B Map(A a);",
+            """
+            [ObjectFactory] B CreateB<S, T>(S source) => new B();
+            partial B Map(A a);
+            """,
             "class A { public string StringValue { get; set; } }",
             "class B { public string StringValue { get; set; } }"
         );
 
         TestHelper
-            .GenerateMapper(source, TestHelperOptions.AllowAllDiagnostics)
-            .Should()
-            .HaveDiagnostic(DiagnosticDescriptors.InvalidObjectFactorySignature)
-            .HaveAssertedAllDiagnostics();
-    }
-
-    [Fact]
-    public void InvalidSignatureGenericSourceTargetSameTypeParameter()
-    {
-        var source = TestSourceBuilder.MapperWithBodyAndTypes(
-            "[ObjectFactory] T CreateB<T>(T source) where T : new() => new T();" + "partial B Map(A a);",
-            "class A { public string StringValue { get; set; } }",
-            "class B { public string StringValue { get; set; } }"
-        );
-
-        TestHelper
-            .GenerateMapper(source, TestHelperOptions.AllowAllDiagnostics)
+            .GenerateMapper(source, TestHelperOptions.AllowDiagnostics)
             .Should()
             .HaveDiagnostic(DiagnosticDescriptors.InvalidObjectFactorySignature)
             .HaveAssertedAllDiagnostics();

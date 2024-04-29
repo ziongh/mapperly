@@ -2,7 +2,6 @@ using Riok.Mapperly.Diagnostics;
 
 namespace Riok.Mapperly.Tests.Mapping;
 
-[UsesVerify]
 public class ObjectPropertyIgnoreTest
 {
     [Fact]
@@ -141,6 +140,30 @@ public class ObjectPropertyIgnoreTest
             .HaveSingleMethodBody(
                 """
                 var target = new global::B();
+                return target;
+                """
+            );
+    }
+
+    [Fact]
+    public void WithNestedIgnoredSourceAndTargetPropertyShouldDiagnostic()
+    {
+        var source = TestSourceBuilder.MapperWithBodyAndTypes(
+            "[MapperIgnoreSource(\"StringValue.Value\")] [MapperIgnoreTarget(\"StringValue.Value\")] partial B Map(A source);",
+            "class A { public string StringValue { get; set; } }",
+            "class B { public string StringValue { get; set; } }"
+        );
+
+        TestHelper
+            .GenerateMapper(source, TestHelperOptions.AllowDiagnostics)
+            .Should()
+            .HaveDiagnostic(DiagnosticDescriptors.NestedIgnoredSourceMember)
+            .HaveDiagnostic(DiagnosticDescriptors.NestedIgnoredTargetMember)
+            .HaveAssertedAllDiagnostics()
+            .HaveSingleMethodBody(
+                """
+                var target = new global::B();
+                target.StringValue = source.StringValue;
                 return target;
                 """
             );

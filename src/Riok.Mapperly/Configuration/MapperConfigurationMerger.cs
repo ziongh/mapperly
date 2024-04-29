@@ -49,6 +49,22 @@ public static class MapperConfigurationMerger
             ?? defaultMapperConfiguration.IgnoreObsoleteMembersStrategy
             ?? mapper.IgnoreObsoleteMembersStrategy;
 
+        mapper.RequiredMappingStrategy =
+            mapperConfiguration.RequiredMappingStrategy
+            ?? defaultMapperConfiguration.RequiredMappingStrategy
+            ?? mapper.RequiredMappingStrategy;
+
+        mapper.IncludedMembers =
+            mapperConfiguration.IncludedMembers ?? defaultMapperConfiguration.IncludedMembers ?? mapper.IncludedMembers;
+
+        mapper.PreferParameterlessConstructors =
+            mapperConfiguration.PreferParameterlessConstructors
+            ?? defaultMapperConfiguration.PreferParameterlessConstructors
+            ?? mapper.PreferParameterlessConstructors;
+
+        mapper.AutoUserMappings =
+            mapperConfiguration.AutoUserMappings ?? defaultMapperConfiguration.AutoUserMappings ?? mapper.AutoUserMappings;
+
         return mapper;
     }
 }

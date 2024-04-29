@@ -2,7 +2,6 @@ using Riok.Mapperly.Diagnostics;
 
 namespace Riok.Mapperly.Tests.Mapping;
 
-[UsesVerify]
 public class ReferenceHandlingTest
 {
     [Fact]
@@ -25,8 +24,10 @@ public class ReferenceHandlingTest
     public Task ManuallyMappedPropertiesShouldWork()
     {
         var source = TestSourceBuilder.MapperWithBodyAndTypes(
-            "[MapProperty(\"Value\", \"MyValue\")] private partial B MapToB(A source);"
-                + "[MapProperty(\"Value\", \"MyValue2\")] private partial B MapToB1(A source);",
+            """
+            [MapProperty("Value", "MyValue")] private partial B MapToB(A source);
+            [MapProperty("Value", "MyValue2")] private partial B MapToB1(A source);
+            """,
             TestSourceBuilderOptions.WithReferenceHandling,
             "class A { public A Parent { get; set; } public C Value { get; set; } }",
             "class B { public B Parent { get; set; } public D MyValue { get; set; } public D MyValue2 { get; set; } }",
@@ -109,8 +110,8 @@ public class ReferenceHandlingTest
             private partial B MapToB(A source, [ReferenceHandler] IReferenceHandler refHandler);
             """,
             TestSourceBuilderOptions.WithReferenceHandling,
-            "class A {}",
-            "class B {}"
+            "class A { public int IntValue { get; set; } }",
+            "class B { public int IntValue { get; set; } }"
         );
 
         return TestHelper.VerifyGenerator(source);
@@ -163,8 +164,8 @@ public class ReferenceHandlingTest
             private partial B MapToB(A source, [ReferenceHandler] IReferenceHandler refHandler);
             """,
             TestSourceBuilderOptions.WithReferenceHandling,
-            "class A {}",
-            "class B {}"
+            "class A { public int IntValue { get; set; } }",
+            "class B { public int IntValue { get; set; } }"
         );
 
         return TestHelper.VerifyGenerator(source);
@@ -274,6 +275,28 @@ public class ReferenceHandlingTest
             "class B { public B Parent { get; set; } public D Value { get; set; } }",
             "class C { public string StringValue { get; set; } }",
             "class D { public string StringValue { get; set; } }"
+        );
+
+        return TestHelper.VerifyGenerator(source);
+    }
+
+    [Fact]
+    public Task MultipleUserDefinedWithSpecifiedDefault()
+    {
+        var source = TestSourceBuilder.MapperWithBodyAndTypes(
+            """
+            public partial B Map(A a);
+            private partial D MapD(C source);
+            [MapperIgnoreSource("IntValue")]
+            [MapperIgnoreTarget("IntValue")]
+            [UserMapping(Default = true)]
+            private partial D MapDIgnore(C source);
+            """,
+            TestSourceBuilderOptions.WithReferenceHandling,
+            "record A(C Value);",
+            "record B(D Value);",
+            "record C(string StringValue, int IntValue);",
+            "record D(string StringValue) { public int IntValue { get; set; } };"
         );
 
         return TestHelper.VerifyGenerator(source);

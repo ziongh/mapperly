@@ -10,24 +10,16 @@ public readonly partial struct SyntaxFactoryHelper
 {
     public static readonly IdentifierNameSyntax VarIdentifier = IdentifierName("var").AddTrailingSpace();
 
-    private readonly string _assemblyName;
-
-    public SyntaxFactoryHelper(string assemblyName)
-    {
-        _assemblyName = assemblyName;
-    }
-
-    private SyntaxFactoryHelper(int indentation, string assemblyName)
+    private SyntaxFactoryHelper(int indentation)
     {
         Indentation = indentation;
-        _assemblyName = assemblyName;
     }
 
     public int Indentation { get; }
 
-    public SyntaxFactoryHelper AddIndentation() => new(Indentation + 1, _assemblyName);
+    public SyntaxFactoryHelper AddIndentation() => new(Indentation + 1);
 
-    public SyntaxFactoryHelper RemoveIndentation() => new(Indentation - 1, _assemblyName);
+    public SyntaxFactoryHelper RemoveIndentation() => new(Indentation - 1);
 
     public static AssignmentExpressionSyntax Assignment(ExpressionSyntax target, ExpressionSyntax source)
     {
@@ -61,6 +53,14 @@ public readonly partial struct SyntaxFactoryHelper
     {
         var sep = TrailingSpacedToken(SyntaxKind.CommaToken);
         var joinedNodes = Join(sep, insertTrailingComma, nodes);
+        return SeparatedList<T>(joinedNodes);
+    }
+
+    public static SeparatedSyntaxList<T> CommaSeparatedList<T>(params T[] nodes)
+        where T : SyntaxNode
+    {
+        var sep = TrailingSpacedToken(SyntaxKind.CommaToken);
+        var joinedNodes = Join(sep, false, nodes);
         return SeparatedList<T>(joinedNodes);
     }
 

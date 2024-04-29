@@ -2,7 +2,6 @@ using Riok.Mapperly.Diagnostics;
 
 namespace Riok.Mapperly.Tests.Mapping;
 
-[UsesVerify]
 public class ObjectPropertyInitPropertyTest
 {
     [Fact]
@@ -313,14 +312,39 @@ public class ObjectPropertyInitPropertyTest
     }
 
     [Fact]
+    public void RequiredPropertyAndCtorParam()
+    {
+        var source = TestSourceBuilder.Mapping(
+            "A",
+            "B",
+            "class A { public double DoubleValue { get; init; } public string StringValue { get; init; } public int IntValue { get; set; } }",
+            "class B { public B(double doubleValue) {} public required string StringValue { get; set; } public int IntValue { get; set; } }"
+        );
+
+        TestHelper
+            .GenerateMapper(source)
+            .Should()
+            .HaveSingleMethodBody(
+                """
+                var target = new global::B(source.DoubleValue)
+                {
+                    StringValue = source.StringValue,
+                };
+                target.IntValue = source.IntValue;
+                return target;
+                """
+            );
+    }
+
+    [Fact]
     public void IgnoredTargetRequiredPropertyWithConfiguration()
     {
         var source = TestSourceBuilder.MapperWithBodyAndTypes(
             """
-                [MapProperty("StringValue", "StringValue")]
-                [MapperIgnoreTarget("StringValue")]
-                partial B Map(A source);
-                """,
+            [MapProperty("StringValue", "StringValue")]
+            [MapperIgnoreTarget("StringValue")]
+            partial B Map(A source);
+            """,
             "A",
             "B",
             "class A { public string StringValue { get; init; } public int IntValue { get; set; } }",
@@ -352,10 +376,10 @@ public class ObjectPropertyInitPropertyTest
     {
         var source = TestSourceBuilder.MapperWithBodyAndTypes(
             """
-                [MapProperty("StringValue", "StringValue")]
-                [MapperIgnoreTarget("StringValue")]
-                partial B Map(A source);
-                """,
+            [MapProperty("StringValue", "StringValue")]
+            [MapperIgnoreTarget("StringValue")]
+            partial B Map(A source);
+            """,
             "A",
             "B",
             "class A { public string StringValue { get; init; } public int IntValue { get; set; } }",
@@ -393,5 +417,30 @@ public class ObjectPropertyInitPropertyTest
         );
 
         return TestHelper.VerifyGenerator(source);
+    }
+
+    [Fact]
+    public void ClassInitOnlyPropertyWithStringFormat()
+    {
+        var source = TestSourceBuilder.MapperWithBodyAndTypes(
+            """
+            [MapProperty("Value", "Value", StringFormat = "C")]
+            partial B Map(A source);",
+            """,
+            "class A { public int Value { get; set; } }",
+            "class B { public string Value { get; init; } }"
+        );
+        TestHelper
+            .GenerateMapper(source)
+            .Should()
+            .HaveSingleMethodBody(
+                """
+                var target = new global::B()
+                {
+                    Value = source.Value.ToString("C"),
+                };
+                return target;
+                """
+            );
     }
 }

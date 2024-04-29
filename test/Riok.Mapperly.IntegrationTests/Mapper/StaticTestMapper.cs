@@ -6,9 +6,10 @@ using Riok.Mapperly.IntegrationTests.Models;
 
 namespace Riok.Mapperly.IntegrationTests.Mapper
 {
-    [Mapper]
+    [Mapper(EnumMappingStrategy = EnumMappingStrategy.ByValue)]
     public static partial class StaticTestMapper
     {
+        [UserMapping(Default = true)]
         public static partial int DirectInt(int value);
 
         public static partial int? DirectIntNullable(int? value);
@@ -30,8 +31,10 @@ namespace Riok.Mapperly.IntegrationTests.Mapper
         [MapperIgnoreSource(nameof(TestObject.IgnoredIntValue))]
         [MapperIgnoreTarget(nameof(TestObjectDto.IgnoredStringValue))]
         [MapperIgnoreObsoleteMembers]
+        [MapperRequiredMapping(RequiredMappingStrategy.Target)]
         public static partial TestObjectDto MapToDtoExt(this TestObject src);
 
+        [UserMapping(Default = true)]
         public static TestObjectDto MapToDto(TestObject src)
         {
             var target = MapToDtoInternal(src);
@@ -67,6 +70,7 @@ namespace Riok.Mapperly.IntegrationTests.Mapper
         [MapperIgnoreTarget(nameof(TestObject.IgnoredStringValue))]
         [MapperIgnoreTarget(nameof(TestObject.IgnoredIntValue))]
         [MapperIgnoreSource(nameof(TestObjectDto.IgnoredIntValue))]
+        [MapperIgnoreSource(nameof(TestObjectDto.SpanValue))]
         public static partial TestObject MapFromDto(TestObjectDto dto);
 
         [MapperIgnoreTarget(nameof(TestObjectDto.IgnoredIntValue))]
@@ -90,6 +94,15 @@ namespace Riok.Mapperly.IntegrationTests.Mapper
 
         public static partial TTarget MapGeneric<TSource, TTarget>(TSource source);
 
+#if NET7_0_OR_GREATER
+        [MapDerivedType<ExistingObjectTypeA, ExistingObjectTypeA>]
+        [MapDerivedType<ExistingObjectTypeB, ExistingObjectTypeB>]
+#else
+        [MapDerivedType(typeof(ExistingObjectTypeA), typeof(ExistingObjectTypeA))]
+        [MapDerivedType(typeof(ExistingObjectTypeB), typeof(ExistingObjectTypeB))]
+#endif
+        public static partial void MapToDerivedExisting(ExistingObjectBase source, ExistingObjectBase target);
+
         [MapEnum(EnumMappingStrategy.ByName)]
         public static partial TestEnumDtoByName MapToEnumDtoByName(TestEnum v);
 
@@ -109,6 +122,7 @@ namespace Riok.Mapperly.IntegrationTests.Mapper
         [MapperIgnoreTargetValue(TestEnum.Value30)]
         public static partial TestEnum MapToEnumByNameWithIgnored(TestEnumDtoAdditionalValue v);
 
+        [UserMapping(Default = true)]
         [MapEnum(EnumMappingStrategy.ByValueCheckDefined)]
         public static partial TestEnum MapToEnumByValueCheckDefined(TestEnumDtoByValue v);
 

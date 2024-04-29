@@ -3,7 +3,6 @@ using Riok.Mapperly.Diagnostics;
 
 namespace Riok.Mapperly.Tests.Mapping;
 
-[UsesVerify]
 public class EnumTest
 {
     [Fact]
@@ -162,22 +161,16 @@ public class EnumTest
     [Fact]
     public void EnumToOtherEnumByNameViaGlobalConfigShouldSwitch()
     {
-        var source =
-            @"
-using System;
-using System.Collections.Generic;
-using Riok.Mapperly.Abstractions;
-
-[Mapper(EnumMappingStrategy = EnumMappingStrategy.ByName)]
-public partial class Mapper
-{
-    partial global::E2 ToE1(global::E1 source);
-}
-
-enum E1 {A, B, C}
-
-enum E2 {A = 100, B, C}
-";
+        var source = TestSourceBuilder.Mapping(
+            "E1",
+            "E2",
+            TestSourceBuilderOptions.Default with
+            {
+                EnumMappingStrategy = EnumMappingStrategy.ByName
+            },
+            "enum E1 {A, B, C}",
+            "enum E2 {A = 100, B, C}"
+        );
 
         TestHelper
             .GenerateMapper(source)
@@ -437,5 +430,20 @@ enum E2 {A = 100, B, C}
         );
 
         return TestHelper.VerifyGenerator(source, null, testCase);
+    }
+
+    [Fact]
+    public void EnumConfigurationOnNonEnumMethodShouldDiagnostic()
+    {
+        var source = TestSourceBuilder.MapperWithBodyAndTypes(
+            "[MapEnum(EnumMappingStrategy.ByValue)] partial B Map(A source);",
+            "record A(int V);",
+            "record B(int V);"
+        );
+        TestHelper
+            .GenerateMapper(source, TestHelperOptions.AllowDiagnostics)
+            .Should()
+            .HaveDiagnostic(DiagnosticDescriptors.EnumConfigurationOnNonEnumMapping)
+            .HaveAssertedAllDiagnostics();
     }
 }

@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -29,26 +30,32 @@ public static class TestHelper
         IReadOnlyCollection<TestAssembly>? additionalAssemblies = null
     )
     {
-        options ??= TestHelperOptions.NoDiagnostics;
+        options ??= TestHelperOptions.Default;
 
         var result = Generate(source, options, additionalAssemblies).GetRunResult();
 
-        var syntaxRoot = result.GeneratedTrees
-            .SingleOrDefault(x => Path.GetFileName(x.FilePath) == options.GeneratedTreeFileName)
+        var syntaxRoot = result
+            .GeneratedTrees.SingleOrDefault(x => Path.GetFileName(x.FilePath) == options.GeneratedTreeFileName)
             ?.GetRoot();
         var methods = ExtractAllMethods(syntaxRoot).Select(x => new GeneratedMethod(x)).ToDictionary(x => x.Name);
 
-        var groupedDiagnostics = result.Diagnostics
+        var ignoredDiagnosticDescriptorIds = options.IgnoredDiagnostics?.Select(x => x.Id).ToHashSet() ?? new HashSet<string>();
+        var filteredDiagnostics = result.Diagnostics.Where(x => !ignoredDiagnosticDescriptorIds.Contains(x.Descriptor.Id)).ToList();
+        var groupedDiagnostics = filteredDiagnostics
             .GroupBy(x => x.Descriptor.Id)
             .ToDictionary(x => x.Key, x => (IReadOnlyCollection<Diagnostic>)x.ToList());
-        var mapperResult = new MapperGenerationResult(result.Diagnostics, groupedDiagnostics, methods);
-        if (options.AllowedDiagnostics != null)
+
+        var mapperResult = new MapperGenerationResult(filteredDiagnostics, groupedDiagnostics, methods);
+        if (options.AllowedDiagnosticSeverities != null)
         {
-            mapperResult.Should().NotHaveDiagnostics(options.AllowedDiagnostics);
+            mapperResult.Should().OnlyHaveDiagnosticSeverities(options.AllowedDiagnosticSeverities);
         }
 
         return mapperResult;
     }
+
+    public static CSharpCompilation BuildCompilation([StringSyntax(StringSyntax.CSharp)] string source) =>
+        BuildCompilation(CSharpSyntaxTree.ParseText(source, CSharpParseOptions.Default));
 
     public static CSharpCompilation BuildCompilation(params SyntaxTree[] syntaxTrees) =>
         BuildCompilation("Tests", NullableContextOptions.Enable, true, syntaxTrees);
@@ -70,16 +77,20 @@ public static class TestHelper
         return driver.RunGenerators(compilation);
     }
 
+    public static Compilation BuildCompilation([StringSyntax(StringSyntax.CSharp)] string source, TestHelperOptions? options)
+    {
+        options ??= TestHelperOptions.Default;
+        var syntaxTree = CSharpSyntaxTree.ParseText(source, CSharpParseOptions.Default.WithLanguageVersion(options.LanguageVersion));
+        return BuildCompilation(options.AssemblyName, options.NullableOption, true, syntaxTree);
+    }
+
     private static GeneratorDriver Generate(
-        string source,
+        [StringSyntax(StringSyntax.CSharp)] string source,
         TestHelperOptions? options,
         IReadOnlyCollection<TestAssembly>? additionalAssemblies = null
     )
     {
-        options ??= TestHelperOptions.NoDiagnostics;
-
-        var syntaxTree = CSharpSyntaxTree.ParseText(source, CSharpParseOptions.Default.WithLanguageVersion(options.LanguageVersion));
-        var compilation = BuildCompilation(options.AssemblyName, options.NullableOption, true, syntaxTree);
+        var compilation = BuildCompilation(source, options);
         if (additionalAssemblies != null)
         {
             compilation = compilation.AddReferences(additionalAssemblies.Select(x => x.MetadataReference));
@@ -101,8 +112,8 @@ public static class TestHelper
         var compilationOptions = new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary, nullableContextOptions: nullableOption);
         var compilation = CSharpCompilation.Create(name, syntaxTrees, options: compilationOptions);
 
-        var references = AppDomain.CurrentDomain
-            .GetAssemblies()
+        var references = AppDomain
+            .CurrentDomain.GetAssemblies()
             .Where(x => !x.IsDynamic && !string.IsNullOrWhiteSpace(x.Location))
             .Select(x => MetadataReference.CreateFromFile(x.Location));
         compilation = compilation.AddReferences(references);

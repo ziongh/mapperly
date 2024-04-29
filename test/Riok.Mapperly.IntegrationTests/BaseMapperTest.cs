@@ -9,12 +9,16 @@ using Riok.Mapperly.IntegrationTests.Dto;
 using Riok.Mapperly.IntegrationTests.Helpers;
 using Riok.Mapperly.IntegrationTests.Models;
 using VerifyTests;
+using VerifyTests.DiffPlex;
 using VerifyXunit;
 
 namespace Riok.Mapperly.IntegrationTests
 {
     public abstract class BaseMapperTest
     {
+        private static readonly string _solutionDirectory = GetSolutionDirectory();
+        private static readonly string _projectDirectory = GetProjectDirectory();
+
         static BaseMapperTest()
         {
 #if !NET6_0_OR_GREATER
@@ -26,27 +30,44 @@ namespace Riok.Mapperly.IntegrationTests
 #endif
 
             VerifierSettings.DontScrubDateTimes();
+            VerifyDiffPlex.Initialize(OutputType.Compact);
 
             Verifier.DerivePathInfo(
-                (file, _, type, method) =>
+                (_, _, type, method) =>
                     new PathInfo(
-                        Path.Combine(Path.GetDirectoryName(file)!, "_snapshots"),
+                        Path.Combine(_projectDirectory, "_snapshots"),
                         type.Name,
                         method.Name + GetSnapshotVersionSuffix(type, method)
                     )
             );
         }
 
-        protected string GetGeneratedMapperFilePath(string name, [CallerFilePath] string filePath = "")
+        protected string GetGeneratedMapperFilePath(string name)
         {
+#if NET8_0_OR_GREATER || NET48_OR_GREATER
+            // artifacts output
             return Path.Combine(
-                Path.GetDirectoryName(filePath)!,
+                _solutionDirectory,
+                "artifacts",
                 "obj",
-                "GeneratedFiles",
+                "Riok.Mapperly.IntegrationTests",
+                "generated",
                 "Riok.Mapperly",
                 "Riok.Mapperly.MapperGenerator",
                 name + ".g.cs"
             );
+#else
+            return Path.Combine(
+                _solutionDirectory,
+                "test",
+                "Riok.Mapperly.IntegrationTests",
+                "obj",
+                "generated",
+                "Riok.Mapperly",
+                "Riok.Mapperly.MapperGenerator",
+                name + ".g.cs"
+            );
+#endif
         }
 
         public static TestObject NewTestObj()
@@ -64,6 +85,7 @@ namespace Riok.Mapperly.IntegrationTests
                 SubObject = new InheritanceSubObject { BaseIntValue = 1, SubIntValue = 2, },
                 EnumRawValue = TestEnum.Value20,
                 EnumStringValue = TestEnum.Value30,
+                DateTimeValue = new DateTime(2020, 1, 3, 15, 10, 5, DateTimeKind.Utc),
                 DateTimeValueTargetDateOnly = new DateTime(2020, 1, 3, 15, 10, 5, DateTimeKind.Utc),
                 DateTimeValueTargetTimeOnly = new DateTime(2020, 1, 3, 15, 10, 5, DateTimeKind.Utc),
                 IgnoredStringValue = "ignored",
@@ -75,6 +97,11 @@ namespace Riok.Mapperly.IntegrationTests
                 NullableFlattening = new() { IdValue = 100 },
                 UnflatteningIdValue = 20,
                 NullableUnflatteningIdValue = 200,
+                NestedMember = new()
+                {
+                    NestedMemberId = 12,
+                    NestedMemberObject = new() { IntValue = 22 }
+                },
                 TupleValue = ("10", "20"),
                 RecursiveObject = new(5)
                 {
@@ -88,7 +115,16 @@ namespace Riok.Mapperly.IntegrationTests
                     new TestObjectNested { IntValue = 10 },
                     new TestObjectNested { IntValue = 20 },
                 },
-                SourceTargetSameObjectType = new TestObject(8) { IntValue = 99, RequiredValue = 98, },
+                SourceTargetSameObjectType = new TestObject(8)
+                {
+                    IntValue = 99,
+                    RequiredValue = 98,
+                    NestedMember = new()
+                    {
+                        NestedMemberId = 123,
+                        NestedMemberObject = new() { IntValue = 223 }
+                    }
+                },
                 MemoryValue = new[] { "1", "2", "3" },
                 StackValue = new Stack<string>(new[] { "1", "2", "3" }),
                 QueueValue = new Queue<string>(new[] { "1", "2", "3" }),
@@ -168,6 +204,27 @@ namespace Riok.Mapperly.IntegrationTests
 #else
             throw new InvalidOperationException("Target framework is not supported");
 #endif
+        }
+
+        private static string GetProjectDirectory() => FindDirectoryOfFile(".csproj");
+
+        private static string GetSolutionDirectory() => FindDirectoryOfFile(".sln");
+
+        private static string FindDirectoryOfFile(string fileExtension, [CallerFilePath] string baseFilePath = "")
+        {
+            var dir =
+                Path.GetDirectoryName(baseFilePath) ?? throw new InvalidOperationException($"Could not get directory from {baseFilePath}");
+
+            while (Directory.GetFiles(dir, "*" + fileExtension, SearchOption.TopDirectoryOnly).Length == 0)
+            {
+                dir = Path.GetDirectoryName(dir);
+                if (dir == null)
+                {
+                    throw new InvalidOperationException($"Could not find directory from file {baseFilePath}");
+                }
+            }
+
+            return dir;
         }
     }
 }
