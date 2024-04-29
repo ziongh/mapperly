@@ -3,7 +3,6 @@ using Riok.Mapperly.Diagnostics;
 
 namespace Riok.Mapperly.Tests.Mapping;
 
-[UsesVerify]
 public class MapperTest
 {
     [Fact]
@@ -146,5 +145,12 @@ public class MapperTest
         );
 
         return TestHelper.VerifyGenerator(source);
+    }
+
+    [Fact]
+    public void RestrictedKeywordParametersShouldBeEscaped()
+    {
+        var source = TestSourceBuilder.MapperWithBody("public partial string Map(int @object);");
+        TestHelper.GenerateMapper(source).Should().HaveSingleMethodBody("return @object.ToString();");
     }
 }

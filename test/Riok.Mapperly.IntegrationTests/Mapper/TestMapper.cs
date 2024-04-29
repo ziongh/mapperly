@@ -1,19 +1,38 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using Riok.Mapperly.Abstractions;
 using Riok.Mapperly.IntegrationTests.Dto;
 using Riok.Mapperly.IntegrationTests.Models;
-
-#if NET8_0
+#if NET8_0_OR_GREATER
 using AliasedTupleSource = (int X, int Y);
 using AliasedTupleTarget = (string X, string Y);
 #endif
 
 namespace Riok.Mapperly.IntegrationTests.Mapper
 {
-    [Mapper]
+#if NET8_0_OR_GREATER
+    [Mapper(IncludedMembers = MemberVisibility.All, EnumMappingStrategy = EnumMappingStrategy.ByValue)]
+#else
+    [Mapper(EnumMappingStrategy = EnumMappingStrategy.ByValue)]
+#endif
     public partial class TestMapper
     {
+        [FormatProvider(Default = true)]
+        private readonly CultureInfo _formatDeCh = (CultureInfo)CultureInfo.GetCultureInfo("de-CH").Clone();
+
+        [FormatProvider]
+        private readonly CultureInfo _formatEnUs = (CultureInfo)CultureInfo.GetCultureInfo("en-US").Clone();
+
+        public TestMapper()
+        {
+            // these seem to vary depending on the OS
+            // set them to a fixed value.
+            _formatDeCh.NumberFormat.CurrencyPositivePattern = 2;
+            _formatEnUs.NumberFormat.CurrencyPositivePattern = 2;
+        }
+
+        [UserMapping(Default = true)]
         public partial int DirectInt(int value);
 
         public partial long ImplicitCastInt(int value);
@@ -30,6 +49,7 @@ namespace Riok.Mapperly.IntegrationTests.Mapper
 
         public partial IEnumerable<TestObjectDto> MapAllDtos(IEnumerable<TestObject> objects);
 
+        [UserMapping(Default = true)]
         public TestObjectDto MapToDto(TestObject src)
         {
             var target = MapToDtoInternal(src);
@@ -40,6 +60,13 @@ namespace Riok.Mapperly.IntegrationTests.Mapper
         [MapperIgnoreTarget(nameof(TestObjectDto.IgnoredStringValue))]
         [MapperIgnoreTarget(nameof(TestObjectDto.IgnoredIntValue))]
         [MapperIgnoreSource(nameof(TestObject.IgnoredIntValue))]
+        [MapProperty(nameof(TestObject.IntValue), nameof(TestObjectDto.FormattedIntValue), StringFormat = "C")]
+        [MapProperty(
+            nameof(TestObject.DateTimeValue),
+            nameof(TestObjectDto.FormattedDateValue),
+            StringFormat = "D",
+            FormatProvider = nameof(_formatEnUs)
+        )]
         [MapProperty(nameof(TestObject.RenamedStringValue), nameof(TestObjectDto.RenamedStringValue2))]
         [MapProperty(
             new[] { nameof(TestObject.UnflatteningIdValue) },
@@ -49,6 +76,7 @@ namespace Riok.Mapperly.IntegrationTests.Mapper
             nameof(TestObject.NullableUnflatteningIdValue),
             nameof(TestObjectDto.NullableUnflattening) + "." + nameof(TestObjectDto.NullableUnflattening.IdValue)
         )]
+        [MapNestedProperties(nameof(TestObject.NestedMember))]
         [MapperIgnoreObsoleteMembers]
         private partial TestObjectDto MapToDtoInternal(TestObject testObject);
 
@@ -57,6 +85,7 @@ namespace Riok.Mapperly.IntegrationTests.Mapper
         [MapperIgnoreTarget(nameof(TestObject.IgnoredStringValue))]
         [MapperIgnoreTarget(nameof(TestObject.IgnoredIntValue))]
         [MapperIgnoreSource(nameof(TestObjectDto.IgnoredIntValue))]
+        [MapperIgnoreSource(nameof(TestObjectDto.SpanValue))]
         public partial TestObject MapFromDto(TestObjectDto dto);
 
         [MapperIgnoreTarget(nameof(TestObjectDto.IgnoredIntValue))]
@@ -68,7 +97,7 @@ namespace Riok.Mapperly.IntegrationTests.Mapper
 
         private partial int PrivateDirectInt(int value);
 
-#if NET8_0
+#if NET8_0_OR_GREATER
         public partial AliasedTupleTarget MapAliasedTuple(AliasedTupleSource source);
 #endif
     }

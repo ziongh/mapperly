@@ -5,20 +5,21 @@ using static Riok.Mapperly.Emit.Syntax.SyntaxFactoryHelper;
 
 namespace Riok.Mapperly.Descriptors.Mappings.MemberMappings;
 
-public class ConstructorParameterMapping
+public class ConstructorParameterMapping(
+    IParameterSymbol parameter,
+    NullMemberMapping delegateMapping,
+    bool selfOrPreviousIsUnmappedOptional
+)
 {
-    private readonly bool _selfOrPreviousIsUnmappedOptional;
+    private readonly bool _selfOrPreviousIsUnmappedOptional = selfOrPreviousIsUnmappedOptional;
 
-    public ConstructorParameterMapping(IParameterSymbol parameter, NullMemberMapping delegateMapping, bool selfOrPreviousIsUnmappedOptional)
-    {
-        DelegateMapping = delegateMapping;
-        Parameter = parameter;
-        _selfOrPreviousIsUnmappedOptional = selfOrPreviousIsUnmappedOptional;
-    }
+    /// <summary>
+    /// The parameter of the constructor.
+    /// Note: the nullability of it may not be "upgraded".
+    /// </summary>
+    public IParameterSymbol Parameter { get; } = parameter;
 
-    public IParameterSymbol Parameter { get; }
-
-    public NullMemberMapping DelegateMapping { get; }
+    public NullMemberMapping DelegateMapping { get; } = delegateMapping;
 
     public ArgumentSyntax BuildArgument(TypeMappingBuildContext ctx)
     {

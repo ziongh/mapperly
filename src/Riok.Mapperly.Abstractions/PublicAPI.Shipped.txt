@@ -42,6 +42,8 @@ Riok.Mapperly.Abstractions.MapperConstructorAttribute.MapperConstructorAttribute
 Riok.Mapperly.Abstractions.MapperIgnoreObsoleteMembersAttribute
 Riok.Mapperly.Abstractions.MapperIgnoreObsoleteMembersAttribute.IgnoreObsoleteStrategy.get -> Riok.Mapperly.Abstractions.IgnoreObsoleteMembersStrategy
 Riok.Mapperly.Abstractions.MapperIgnoreObsoleteMembersAttribute.MapperIgnoreObsoleteMembersAttribute(Riok.Mapperly.Abstractions.IgnoreObsoleteMembersStrategy ignoreObsoleteStrategy = (Riok.Mapperly.Abstractions.IgnoreObsoleteMembersStrategy)-1) -> void
+Riok.Mapperly.Abstractions.MapperIgnoreAttribute
+Riok.Mapperly.Abstractions.MapperIgnoreAttribute.MapperIgnoreAttribute() -> void
 Riok.Mapperly.Abstractions.MapperIgnoreSourceAttribute
 Riok.Mapperly.Abstractions.MapperIgnoreSourceAttribute.MapperIgnoreSourceAttribute(string! source) -> void
 Riok.Mapperly.Abstractions.MapperIgnoreSourceAttribute.Source.get -> string!
@@ -55,6 +57,8 @@ Riok.Mapperly.Abstractions.MapPropertyAttribute.Source.get -> System.Collections
 Riok.Mapperly.Abstractions.MapPropertyAttribute.SourceFullName.get -> string!
 Riok.Mapperly.Abstractions.MapPropertyAttribute.Target.get -> System.Collections.Generic.IReadOnlyCollection<string!>!
 Riok.Mapperly.Abstractions.MapPropertyAttribute.TargetFullName.get -> string!
+Riok.Mapperly.Abstractions.MapPropertyAttribute.StringFormat.get -> string?
+Riok.Mapperly.Abstractions.MapPropertyAttribute.StringFormat.set -> void
 Riok.Mapperly.Abstractions.ObjectFactoryAttribute
 Riok.Mapperly.Abstractions.ObjectFactoryAttribute.ObjectFactoryAttribute() -> void
 Riok.Mapperly.Abstractions.PropertyNameMappingStrategy
@@ -111,3 +115,50 @@ Riok.Mapperly.Abstractions.UseStaticMapperAttribute
 Riok.Mapperly.Abstractions.UseStaticMapperAttribute.UseStaticMapperAttribute(System.Type! mapperType) -> void
 Riok.Mapperly.Abstractions.UseStaticMapperAttribute<T>
 Riok.Mapperly.Abstractions.UseStaticMapperAttribute<T>.UseStaticMapperAttribute() -> void
+Riok.Mapperly.Abstractions.MapperAttribute.RequiredMappingStrategy.get -> Riok.Mapperly.Abstractions.RequiredMappingStrategy
+Riok.Mapperly.Abstractions.MapperAttribute.RequiredMappingStrategy.set -> void
+Riok.Mapperly.Abstractions.MapperRequiredMappingAttribute
+Riok.Mapperly.Abstractions.MapperRequiredMappingAttribute.MapperRequiredMappingAttribute(Riok.Mapperly.Abstractions.RequiredMappingStrategy requiredMappingStrategy) -> void
+Riok.Mapperly.Abstractions.MapperRequiredMappingAttribute.RequiredMappingStrategy.get -> Riok.Mapperly.Abstractions.RequiredMappingStrategy
+Riok.Mapperly.Abstractions.RequiredMappingStrategy
+Riok.Mapperly.Abstractions.RequiredMappingStrategy.Both = -1 -> Riok.Mapperly.Abstractions.RequiredMappingStrategy
+Riok.Mapperly.Abstractions.RequiredMappingStrategy.None = 0 -> Riok.Mapperly.Abstractions.RequiredMappingStrategy
+Riok.Mapperly.Abstractions.RequiredMappingStrategy.Source = 1 -> Riok.Mapperly.Abstractions.RequiredMappingStrategy
+Riok.Mapperly.Abstractions.RequiredMappingStrategy.Target = 2 -> Riok.Mapperly.Abstractions.RequiredMappingStrategy
+Riok.Mapperly.Abstractions.MapperAttribute.IncludedMembers.get -> Riok.Mapperly.Abstractions.MemberVisibility
+Riok.Mapperly.Abstractions.MapperAttribute.IncludedMembers.set -> void
+Riok.Mapperly.Abstractions.MemberVisibility
+Riok.Mapperly.Abstractions.MemberVisibility.Accessible = 1 -> Riok.Mapperly.Abstractions.MemberVisibility
+Riok.Mapperly.Abstractions.MemberVisibility.All = Riok.Mapperly.Abstractions.MemberVisibility.Public | Riok.Mapperly.Abstractions.MemberVisibility.Internal | Riok.Mapperly.Abstractions.MemberVisibility.Protected | Riok.Mapperly.Abstractions.MemberVisibility.Private -> Riok.Mapperly.Abstractions.MemberVisibility
+Riok.Mapperly.Abstractions.MemberVisibility.AllAccessible = Riok.Mapperly.Abstractions.MemberVisibility.Accessible | Riok.Mapperly.Abstractions.MemberVisibility.All -> Riok.Mapperly.Abstractions.MemberVisibility
+Riok.Mapperly.Abstractions.MemberVisibility.Internal = 4 -> Riok.Mapperly.Abstractions.MemberVisibility
+Riok.Mapperly.Abstractions.MemberVisibility.Private = 16 -> Riok.Mapperly.Abstractions.MemberVisibility
+Riok.Mapperly.Abstractions.MemberVisibility.Protected = 8 -> Riok.Mapperly.Abstractions.MemberVisibility
+Riok.Mapperly.Abstractions.MemberVisibility.Public = 2 -> Riok.Mapperly.Abstractions.MemberVisibility
+Riok.Mapperly.Abstractions.FormatProviderAttribute
+Riok.Mapperly.Abstractions.FormatProviderAttribute.Default.get -> bool
+Riok.Mapperly.Abstractions.FormatProviderAttribute.Default.set -> void
+Riok.Mapperly.Abstractions.FormatProviderAttribute.FormatProviderAttribute() -> void
+Riok.Mapperly.Abstractions.MapPropertyAttribute.FormatProvider.get -> string?
+Riok.Mapperly.Abstractions.MapPropertyAttribute.FormatProvider.set -> void
+Riok.Mapperly.Abstractions.ReferenceHandling.PreserveReferenceHandler
+Riok.Mapperly.Abstractions.ReferenceHandling.PreserveReferenceHandler.PreserveReferenceHandler() -> void
+Riok.Mapperly.Abstractions.ReferenceHandling.PreserveReferenceHandler.SetReference<TSource, TTarget>(TSource source, TTarget target) -> void
+Riok.Mapperly.Abstractions.ReferenceHandling.PreserveReferenceHandler.TryGetReference<TSource, TTarget>(TSource source, out TTarget? target) -> bool
+Riok.Mapperly.Abstractions.MapperAttribute.PreferParameterlessConstructors.get -> bool
+Riok.Mapperly.Abstractions.MapperAttribute.PreferParameterlessConstructors.set -> void
+Riok.Mapperly.Abstractions.MapperAttribute.AutoUserMappings.get -> bool
+Riok.Mapperly.Abstractions.MapperAttribute.AutoUserMappings.set -> void
+Riok.Mapperly.Abstractions.UserMappingAttribute
+Riok.Mapperly.Abstractions.UserMappingAttribute.Ignore.get -> bool
+Riok.Mapperly.Abstractions.UserMappingAttribute.Ignore.set -> void
+Riok.Mapperly.Abstractions.UserMappingAttribute.UserMappingAttribute() -> void
+Riok.Mapperly.Abstractions.UserMappingAttribute.Default.get -> bool
+Riok.Mapperly.Abstractions.UserMappingAttribute.Default.set -> void
+Riok.Mapperly.Abstractions.MapPropertyAttribute.Use.get -> string?
+Riok.Mapperly.Abstractions.MapPropertyAttribute.Use.set -> void
+Riok.Mapperly.Abstractions.MapNestedPropertiesAttribute
+Riok.Mapperly.Abstractions.MapNestedPropertiesAttribute.MapNestedPropertiesAttribute(string! source) -> void
+Riok.Mapperly.Abstractions.MapNestedPropertiesAttribute.MapNestedPropertiesAttribute(string![]! source) -> void
+Riok.Mapperly.Abstractions.MapNestedPropertiesAttribute.Source.get -> System.Collections.Generic.IReadOnlyCollection<string!>!
+Riok.Mapperly.Abstractions.MapNestedPropertiesAttribute.SourceFullName.get -> string!

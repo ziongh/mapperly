@@ -11,7 +11,11 @@ obj/
 # dot user settings
 *.DotSettings.user
 
-# Visual Studio code coverage results
+# test logs
+**/TestResults/**/*.xml
+
+# code coverage results
 *.coverage
 *.coveragexml
-.idea/
+coverage.cobertura.xml
+.idea

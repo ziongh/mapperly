@@ -1,5 +1,6 @@
 using Riok.Mapperly.Descriptors.Mappings.MemberMappings;
 using Riok.Mapperly.Diagnostics;
+using Riok.Mapperly.Helpers;
 using Riok.Mapperly.Symbols;
 
 namespace Riok.Mapperly.Descriptors.MappingBodyBuilders.BuilderContext;
@@ -8,13 +9,12 @@ namespace Riok.Mapperly.Descriptors.MappingBodyBuilders.BuilderContext;
 /// An <see cref="IMembersContainerBuilderContext{T}"/> implementation.
 /// </summary>
 /// <typeparam name="T">The type of mapping.</typeparam>
-public class MembersContainerBuilderContext<T> : MembersMappingBuilderContext<T>, IMembersContainerBuilderContext<T>
+public class MembersContainerBuilderContext<T>(MappingBuilderContext builderContext, T mapping)
+    : MembersMappingBuilderContext<T>(builderContext, mapping),
+        IMembersContainerBuilderContext<T>
     where T : IMemberAssignmentTypeMapping
 {
     private readonly Dictionary<MemberPath, MemberNullDelegateAssignmentMapping> _nullDelegateMappings = new();
-
-    public MembersContainerBuilderContext(MappingBuilderContext builderContext, T mapping)
-        : base(builderContext, mapping) { }
 
     public void AddMemberAssignmentMapping(IMemberAssignmentMapping memberMapping) => AddMemberAssignmentMapping(Mapping, memberMapping);
 
@@ -23,6 +23,17 @@ public class MembersContainerBuilderContext<T> : MembersMappingBuilderContext<T>
         var nullConditionSourcePath = new MemberPath(memberMapping.SourcePath.PathWithoutTrailingNonNullable().ToList());
         var container = GetOrCreateNullDelegateMappingForPath(nullConditionSourcePath);
         AddMemberAssignmentMapping(container, memberMapping);
+
+        // set target member to null if null assignments are allowed
+        // and the source is null
+        if (BuilderContext.Configuration.Mapper.AllowNullPropertyAssignment && memberMapping.TargetPath.Member.Type.IsNullable())
+        {
+            container.AddNullMemberAssignment(SetterMemberPath.Build(BuilderContext, memberMapping.TargetPath));
+        }
+        else if (BuilderContext.Configuration.Mapper.ThrowOnPropertyMappingNullMismatch)
+        {
+            container.ThrowOnSourcePathNull();
+        }
     }
 
     private void AddMemberAssignmentMapping(IMemberAssignmentMappingContainer container, IMemberAssignmentMapping mapping)
@@ -42,13 +53,24 @@ public class MembersContainerBuilderContext<T> : MembersMappingBuilderContext<T>
             if (!nullablePath.Member.CanSet)
                 continue;
 
-            if (!BuilderContext.SymbolAccessor.HasAccessibleParameterlessConstructor(type))
+            if (!BuilderContext.SymbolAccessor.HasDirectlyAccessibleParameterlessConstructor(type))
             {
                 BuilderContext.ReportDiagnostic(DiagnosticDescriptors.NoParameterlessConstructorFound, type);
                 continue;
             }
 
-            container.AddMemberMappingContainer(new MemberNullAssignmentInitializerMapping(nullablePath));
+            var setterNullablePath = SetterMemberPath.Build(BuilderContext, nullablePath);
+
+            if (setterNullablePath.IsMethod)
+            {
+                var getterNullablePath = GetterMemberPath.Build(BuilderContext, nullablePath);
+                container.AddMemberMappingContainer(
+                    new MethodMemberNullAssignmentInitializerMapping(setterNullablePath, getterNullablePath)
+                );
+                continue;
+            }
+
+            container.AddMemberMappingContainer(new MemberNullAssignmentInitializerMapping(setterNullablePath));
         }
     }
 
@@ -61,18 +83,23 @@ public class MembersContainerBuilderContext<T> : MembersMappingBuilderContext<T>
         IMemberAssignmentMappingContainer parentMapping = Mapping;
 
         // try to reuse parent path mappings and wrap inside them
+        // if the parentMapping is the first nullable path, no need to access the path in the condition in a null-safe way.
+        var needsNullSafeAccess = false;
         foreach (var nullablePath in nullConditionSourcePath.ObjectPathNullableSubPaths().Reverse())
         {
             if (_nullDelegateMappings.TryGetValue(new MemberPath(nullablePath), out var parentMappingHolder))
             {
                 parentMapping = parentMappingHolder;
+                break;
             }
+
+            needsNullSafeAccess = true;
         }
 
         mapping = new MemberNullDelegateAssignmentMapping(
-            nullConditionSourcePath,
+            GetterMemberPath.Build(BuilderContext, nullConditionSourcePath),
             parentMapping,
-            BuilderContext.MapperConfiguration.ThrowOnPropertyMappingNullMismatch
+            needsNullSafeAccess
         );
         _nullDelegateMappings[nullConditionSourcePath] = mapping;
         parentMapping.AddMemberMappingContainer(mapping);

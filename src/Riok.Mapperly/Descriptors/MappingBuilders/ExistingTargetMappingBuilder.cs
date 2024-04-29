@@ -1,31 +1,26 @@
-using Microsoft.CodeAnalysis;
 using Riok.Mapperly.Descriptors.Mappings.ExistingTarget;
 
 namespace Riok.Mapperly.Descriptors.MappingBuilders;
 
-public class ExistingTargetMappingBuilder
+public class ExistingTargetMappingBuilder(MappingCollection mappings)
 {
     private delegate IExistingTargetMapping? BuildExistingTargetMapping(MappingBuilderContext context);
 
     private static readonly IReadOnlyCollection<BuildExistingTargetMapping> _builders = new BuildExistingTargetMapping[]
     {
         NullableMappingBuilder.TryBuildExistingTargetMapping,
+        DerivedTypeMappingBuilder.TryBuildExistingTargetMapping,
         DictionaryMappingBuilder.TryBuildExistingTargetMapping,
         SpanMappingBuilder.TryBuildExistingTargetMapping,
         MemoryMappingBuilder.TryBuildExistingTargetMapping,
         EnumerableMappingBuilder.TryBuildExistingTargetMapping,
-        NewInstanceObjectPropertyMappingBuilder.TryBuildExistingTargetMapping,
+        NewInstanceObjectMemberMappingBuilder.TryBuildExistingTargetMapping,
     };
 
-    private readonly MappingCollection _mappings;
-
-    public ExistingTargetMappingBuilder(MappingCollection mappings)
+    public IExistingTargetMapping? Find(TypeMappingKey mappingKey)
     {
-        _mappings = mappings;
+        return mappings.FindExistingInstanceMapping(mappingKey);
     }
-
-    public IExistingTargetMapping? Find(ITypeSymbol sourceType, ITypeSymbol targetType) =>
-        _mappings.FindExistingInstanceMapping(sourceType, targetType);
 
     public IExistingTargetMapping? Build(MappingBuilderContext ctx, bool resultIsReusable)
     {
@@ -36,10 +31,10 @@ public class ExistingTargetMappingBuilder
 
             if (resultIsReusable)
             {
-                _mappings.AddExistingTargetMapping(mapping);
+                mappings.AddExistingTargetMapping(mapping, ctx.MappingKey.Configuration);
             }
 
-            _mappings.EnqueueToBuildBody(mapping, ctx);
+            mappings.EnqueueToBuildBody(mapping, ctx);
             return mapping;
         }
 

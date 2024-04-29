@@ -3,6 +3,7 @@
 #nullable enable
 public partial class Mapper
 {
+    [global::System.CodeDom.Compiler.GeneratedCode("Riok.Mapperly", "0.0.1.0")]
     private partial global::B? Map(global::A? source)
     {
         if (source == null)
@@ -10,12 +11,17 @@ public partial class Mapper
         var target = new global::B();
         if (source.Value != null)
         {
-            target.Value = MapToIReadOnlyCollection(source.Value);
+            target.Value = MapToStringArray(source.Value);
+        }
+        else
+        {
+            target.Value = null;
         }
         return target;
     }
 
-    private global::System.Collections.Generic.IReadOnlyCollection<string?> MapToIReadOnlyCollection(int[] source)
+    [global::System.CodeDom.Compiler.GeneratedCode("Riok.Mapperly", "0.0.1.0")]
+    private string?[] MapToStringArray(int[] source)
     {
         var target = new string?[source.Length];
         for (var i = 0; i < source.Length; i++)

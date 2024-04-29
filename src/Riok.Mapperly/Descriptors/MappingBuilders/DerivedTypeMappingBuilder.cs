@@ -1,6 +1,7 @@
 using Microsoft.CodeAnalysis;
 using Riok.Mapperly.Configuration;
 using Riok.Mapperly.Descriptors.Mappings;
+using Riok.Mapperly.Descriptors.Mappings.ExistingTarget;
 using Riok.Mapperly.Diagnostics;
 using Riok.Mapperly.Helpers;
 
@@ -19,6 +20,12 @@ public static class DerivedTypeMappingBuilder
             : new DerivedTypeSwitchMapping(ctx.Source, ctx.Target, derivedTypeMappings);
     }
 
+    public static IExistingTargetMapping? TryBuildExistingTargetMapping(MappingBuilderContext ctx)
+    {
+        var derivedTypeMappings = TryBuildExistingTargetContainedMappings(ctx);
+        return derivedTypeMappings == null ? null : new DerivedExistingTargetTypeSwitchMapping(ctx.Source, ctx.Target, derivedTypeMappings);
+    }
+
     public static IReadOnlyCollection<INewInstanceMapping>? TryBuildContainedMappings(
         MappingBuilderContext ctx,
         bool duplicatedSourceTypesAllowed = false
@@ -26,51 +33,70 @@ public static class DerivedTypeMappingBuilder
     {
         return ctx.Configuration.DerivedTypes.Count == 0
             ? null
-            : BuildContainedMappings(ctx, ctx.Configuration.DerivedTypes, duplicatedSourceTypesAllowed);
+            : BuildContainedMappings(ctx, ctx.Configuration.DerivedTypes, ctx.FindOrBuildMapping, duplicatedSourceTypesAllowed);
     }
 
-    private static IReadOnlyCollection<INewInstanceMapping> BuildContainedMappings(
+    private static IReadOnlyCollection<IExistingTargetMapping>? TryBuildExistingTargetContainedMappings(
         MappingBuilderContext ctx,
-        IReadOnlyCollection<DerivedTypeMappingConfiguration> configs,
-        bool duplicatedSourceTypesAllowed
+        bool duplicatedSourceTypesAllowed = false
     )
     {
+        return ctx.Configuration.DerivedTypes.Count == 0
+            ? null
+            : BuildContainedMappings(
+                ctx,
+                ctx.Configuration.DerivedTypes,
+                (source, target, options, _) => ctx.FindOrBuildExistingTargetMapping(source, target, options),
+                duplicatedSourceTypesAllowed
+            );
+    }
+
+    private static IReadOnlyCollection<TMapping> BuildContainedMappings<TMapping>(
+        MappingBuilderContext ctx,
+        IReadOnlyCollection<DerivedTypeMappingConfiguration> configs,
+        Func<ITypeSymbol, ITypeSymbol, MappingBuildingOptions, Location?, TMapping?> findOrBuildMapping,
+        bool duplicatedSourceTypesAllowed
+    )
+        where TMapping : ITypeMapping
+    {
         var derivedTypeMappingSourceTypes = new HashSet<ITypeSymbol>(SymbolEqualityComparer.Default);
-        var derivedTypeMappings = new List<INewInstanceMapping>(configs.Count);
-        Func<ITypeSymbol, bool> isAssignableToSource = ctx.Source is ITypeParameterSymbol sourceTypeParameter
-            ? t => ctx.SymbolAccessor.DoesTypeSatisfyTypeParameterConstraints(sourceTypeParameter, t, ctx.Source.NullableAnnotation)
-            : t => ctx.SymbolAccessor.HasImplicitConversion(t, ctx.Source);
-        Func<ITypeSymbol, bool> isAssignableToTarget = ctx.Target is ITypeParameterSymbol targetTypeParameter
-            ? t => ctx.SymbolAccessor.DoesTypeSatisfyTypeParameterConstraints(targetTypeParameter, t, ctx.Target.NullableAnnotation)
-            : t => ctx.SymbolAccessor.HasImplicitConversion(t, ctx.Target);
+        var derivedTypeMappings = new List<TMapping>(configs.Count);
 
         foreach (var config in configs)
         {
             // set types non-nullable as they can never be null when type-switching.
             var sourceType = config.SourceType.NonNullable();
+            var targetType = config.TargetType.NonNullable();
             if (!duplicatedSourceTypesAllowed && !derivedTypeMappingSourceTypes.Add(sourceType))
             {
                 ctx.ReportDiagnostic(DiagnosticDescriptors.DerivedSourceTypeDuplicated, sourceType);
                 continue;
             }
 
-            if (!isAssignableToSource(sourceType))
+            var typeCheckerResult = ctx.GenericTypeChecker.InferAndCheckTypes(
+                ctx.UserSymbol!.TypeParameters,
+                (ctx.Source, sourceType),
+                (ctx.Target, targetType)
+            );
+            if (!typeCheckerResult.Success)
             {
-                ctx.ReportDiagnostic(DiagnosticDescriptors.DerivedSourceTypeIsNotAssignableToParameterType, sourceType, ctx.Source);
+                if (ReferenceEquals(sourceType, typeCheckerResult.FailedArgument))
+                {
+                    ctx.ReportDiagnostic(DiagnosticDescriptors.DerivedSourceTypeIsNotAssignableToParameterType, sourceType, ctx.Source);
+                }
+                else
+                {
+                    ctx.ReportDiagnostic(DiagnosticDescriptors.DerivedTargetTypeIsNotAssignableToReturnType, targetType, ctx.Target);
+                }
+
                 continue;
             }
 
-            var targetType = config.TargetType.NonNullable();
-            if (!isAssignableToTarget(targetType))
-            {
-                ctx.ReportDiagnostic(DiagnosticDescriptors.DerivedTargetTypeIsNotAssignableToReturnType, targetType, ctx.Target);
-                continue;
-            }
-
-            var mapping = ctx.FindOrBuildMapping(
+            var mapping = findOrBuildMapping(
                 sourceType,
                 targetType,
-                MappingBuildingOptions.KeepUserSymbol | MappingBuildingOptions.MarkAsReusable | MappingBuildingOptions.ClearDerivedTypes
+                MappingBuildingOptions.KeepUserSymbol | MappingBuildingOptions.MarkAsReusable | MappingBuildingOptions.IgnoreDerivedTypes,
+                config.Location
             );
             if (mapping == null)
             {

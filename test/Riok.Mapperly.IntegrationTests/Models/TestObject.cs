@@ -10,6 +10,7 @@ namespace Riok.Mapperly.IntegrationTests.Models
         {
             CtorValue = ctorValue;
             CtorValue2 = ctorValue2;
+            PrivateValue = ctorValue + 11;
         }
 
         public int CtorValue { get; set; }
@@ -26,6 +27,8 @@ namespace Riok.Mapperly.IntegrationTests.Models
         public int RequiredValue { get; init; }
 #endif
 
+        public int UnmappedValue => 10;
+
         public string StringValue { get; set; } = string.Empty;
 
         public string RenamedStringValue { get; set; } = string.Empty;
@@ -41,6 +44,8 @@ namespace Riok.Mapperly.IntegrationTests.Models
         public TestObjectNested? NestedNullable { get; set; }
 
         public TestObjectNested? NestedNullableTargetNotNullable { get; set; }
+
+        public TestObjectNestedMember? NestedMember { get; set; }
 
         public string? StringNullableTargetNotNullable { get; set; }
 
@@ -113,8 +118,14 @@ namespace Riok.Mapperly.IntegrationTests.Models
 
         public int IgnoredIntValue { get; set; }
 
+        public DateTime DateTimeValue { get; set; }
+
         public DateTime DateTimeValueTargetDateOnly { get; set; }
 
         public DateTime DateTimeValueTargetTimeOnly { get; set; }
+
+        public int ExposePrivateValue => PrivateValue;
+
+        private int PrivateValue { get; set; }
     }
 }

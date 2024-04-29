@@ -10,8 +10,13 @@ namespace Riok.Mapperly.Descriptors.MappingBodyBuilders.BuilderContext;
 public class NewInstanceBuilderContext<T> : MembersMappingBuilderContext<T>, INewInstanceBuilderContext<T>
     where T : INewInstanceObjectMemberMapping
 {
+    public IReadOnlyDictionary<string, string> RootTargetNameCasingMapping { get; }
+
     public NewInstanceBuilderContext(MappingBuilderContext builderContext, T mapping)
-        : base(builderContext, mapping) { }
+        : base(builderContext, mapping)
+    {
+        RootTargetNameCasingMapping = MemberConfigsByRootTargetName.ToDictionary(x => x.Key, x => x.Key, StringComparer.OrdinalIgnoreCase);
+    }
 
     public void AddInitMemberMapping(MemberAssignmentMapping mapping)
     {
@@ -21,7 +26,8 @@ public class NewInstanceBuilderContext<T> : MembersMappingBuilderContext<T>, INe
 
     public void AddConstructorParameterMapping(ConstructorParameterMapping mapping)
     {
-        MemberConfigsByRootTargetName.Remove(mapping.Parameter.Name);
+        var paramName = RootTargetNameCasingMapping.GetValueOrDefault(mapping.Parameter.Name, defaultValue: mapping.Parameter.Name);
+        MemberConfigsByRootTargetName.Remove(paramName);
         SetSourceMemberMapped(mapping.DelegateMapping.SourcePath);
         Mapping.AddConstructorParameterMapping(mapping);
     }

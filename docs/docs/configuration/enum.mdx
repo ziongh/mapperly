@@ -21,41 +21,39 @@ Available strategies:
 
 The `IgnoreCase` property allows to opt in for case insensitive mappings (defaults to `false`).
 
-<!-- do not indent this, it won't work, https://stackoverflow.com/a/67579641/3302887 -->
-
 <Tabs>
-<TabItem value="global" label="Global (mapper level)" default>
-
-Applied to all enums mapped inside this mapper.
-
-```csharp
-// highlight-start
-[Mapper(EnumMappingStrategy = EnumMappingStrategy.ByName, EnumMappingIgnoreCase = true)]
-// highlight-end
-public partial class CarMapper
-{
-    ...
-}
-```
-
-</TabItem>
-<TabItem value="enum" label="Enum (mapping method level)">
-
-Applied to the specific enum mapped by this method.
-Attribute is only valid on mapping method with enums as parameters.
-
-```csharp
-[Mapper]
-public partial class CarMapper
-{
-    // highlight-start
-    [MapEnum(EnumMappingStrategy.ByName, IgnoreCase = true)]
-    // highlight-end
-    public partial CarMakeDto MapMake(CarMake make);
-}
-```
-
-</TabItem>
+  <TabItem value="global" label="Global (mapper level)" default>
+  
+  Applied to all enums mapped inside this mapper.
+  
+  ```csharp
+  // highlight-start
+  [Mapper(EnumMappingStrategy = EnumMappingStrategy.ByName, EnumMappingIgnoreCase = true)]
+  // highlight-end
+  public partial class CarMapper
+  {
+      ...
+  }
+  ```
+  
+  </TabItem>
+  <TabItem value="enum" label="Enum (mapping method level)">
+  
+  Applied to the specific enum mapped by this method.
+  Attribute is only valid on mapping method with enums as parameters.
+  
+  ```csharp
+  [Mapper]
+  public partial class CarMapper
+  {
+      // highlight-start
+      [MapEnum(EnumMappingStrategy.ByName, IgnoreCase = true)]
+      // highlight-end
+      public partial CarMakeDto MapMake(CarMake make);
+  }
+  ```
+  
+  </TabItem>
 </Tabs>
 
 ## Manually mapped enum values
@@ -115,10 +113,51 @@ public partial class CarMapper
 To enforce strict enum mappings
 (all source enum values have to be mapped to a target enum value
 and all target enum values have to be mapped from a source enum value)
-set the following two EditorConfig settings (see also [analyzer diagnostics](./analyzer-diagnostics.mdx)):
+set the following two EditorConfig settings (see also [analyzer diagnostics](./analyzer-diagnostics/index.mdx)):
 
 ```editorconfig title=".editorconfig"
 [*.cs]
 dotnet_diagnostic.RMG037.severity = error # Unmapped target enum value
 dotnet_diagnostic.RMG038.severity = error # Unmapped source enum value
 ```
+
+### One side strict enum member mappings
+
+To enforce strict enum member mappings on only either the source or the target,
+the `RequiredMappingStrategy` can be used.
+
+<Tabs>
+    <TabItem value="global" label="Global (mapper level)" default>
+    
+        Sets the `RequiredMappingStrategy` for all methods within the mapper,
+        by default it is `Both` requiring all members to be mapped.
+        This can be overriden by individual mapping methods using `MapperRequiredMappingAttribute`.
+    
+        ```csharp
+        // highlight-start
+        [Mapper(RequiredMappingStrategy = RequiredMappingStrategy.Source)]
+        // highlight-end
+        public partial class CarMapper
+        {
+            ...
+        }
+        ```
+    
+    </TabItem>
+    <TabItem value="local" label="Local (mapping method level)">
+    
+        Applied to the specific mapping method.
+    
+        ```csharp
+        [Mapper]
+        public partial class CarMapper
+        {
+            // highlight-start
+            [MapperRequiredMapping(RequiredMappingStrategy.Source)]
+            // highlight-end
+            public partial CarFeatureDto MapCar(CarFeature feature);
+        }
+        ```
+    
+    </TabItem>
+</Tabs>

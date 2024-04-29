@@ -1,7 +1,11 @@
+using Riok.Mapperly.Abstractions;
+
 namespace Riok.Mapperly.Configuration;
 
 public record MappingConfiguration(
+    MapperAttribute Mapper,
     EnumMappingConfiguration Enum,
-    PropertiesMappingConfiguration Properties,
-    IReadOnlyCollection<DerivedTypeMappingConfiguration> DerivedTypes
+    MembersMappingConfiguration Members,
+    IReadOnlyCollection<DerivedTypeMappingConfiguration> DerivedTypes,
+    bool MapOnlyPrimitives
 );

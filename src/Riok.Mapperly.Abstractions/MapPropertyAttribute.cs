@@ -1,9 +1,12 @@
+using System.Diagnostics;
+
 namespace Riok.Mapperly.Abstractions;
 
 /// <summary>
 /// Specifies options for a property mapping.
 /// </summary>
 [AttributeUsage(AttributeTargets.Method, AllowMultiple = true)]
+[Conditional("MAPPERLY_ABSTRACTIONS_SCOPE_RUNTIME")]
 public sealed class MapPropertyAttribute : Attribute
 {
     private const string PropertyAccessSeparatorStr = ".";
@@ -47,4 +50,21 @@ public sealed class MapPropertyAttribute : Attribute
     /// Gets the full name of the target property path.
     /// </summary>
     public string TargetFullName => string.Join(PropertyAccessSeparatorStr, Target);
+
+    /// <summary>
+    /// Gets or sets the format of the <c>ToString</c> conversion (implementing <see cref="IFormattable" />).
+    /// </summary>
+    public string? StringFormat { get; set; }
+
+    /// <summary>
+    /// Gets or sets the name of a format provider field or property to be used for conversions accepting a format provider (implementing <see cref="IFormattable"/>).
+    /// If <c>null</c> the default format provider (annotated with <see cref="FormatProviderAttribute"/> and <see cref="FormatProviderAttribute.Default"/> <c>true</c>)
+    /// or none (if no default format provider is provided) is used.
+    /// </summary>
+    public string? FormatProvider { get; set; }
+
+    /// <summary>
+    /// Reference to a unique named mapping method which should be used to map this member.
+    /// </summary>
+    public string? Use { get; set; }
 }

@@ -1,4 +1,4 @@
-﻿#if !ROSLYN4_4_OR_GREATER
+#if !ROSLYN4_4_OR_GREATER
 
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -14,8 +14,8 @@ internal static class SyntaxProvider
 
     public static IncrementalValuesProvider<MapperDeclaration> GetMapperDeclarations(IncrementalGeneratorInitializationContext context)
     {
-        return context.SyntaxProvider
-            .CreateSyntaxProvider(
+        return context
+            .SyntaxProvider.CreateSyntaxProvider(
                 static (s, _) => s is ClassDeclarationSyntax { AttributeLists.Count: > 0 },
                 static (ctx, ct) => GetMapperDeclaration(ctx, ct)
             )
@@ -24,10 +24,10 @@ internal static class SyntaxProvider
 
     public static IncrementalValueProvider<IAssemblySymbol?> GetMapperDefaultDeclarations(IncrementalGeneratorInitializationContext context)
     {
-        return context.SyntaxProvider
-            .CreateSyntaxProvider(
+        return context
+            .SyntaxProvider.CreateSyntaxProvider(
                 static (s, _) => s is CompilationUnitSyntax { AttributeLists.Count: > 0 },
-                static (ctx, ct) => GetMapperDefaultDeclarations(ctx, ct)
+                static (ctx, ct) => GetMapperDefaultDeclarations(ctx)
             )
             .Collect()
             .Select((x, _) => x.FirstOrDefault());
@@ -42,12 +42,9 @@ internal static class SyntaxProvider
         return HasAttribute(symbol, MapperGenerator.MapperAttributeName) ? new MapperDeclaration(symbol, declaration) : null;
     }
 
-    private static IAssemblySymbol? GetMapperDefaultDeclarations(GeneratorSyntaxContext ctx, CancellationToken cancellationToken)
+    private static IAssemblySymbol? GetMapperDefaultDeclarations(GeneratorSyntaxContext ctx)
     {
-        var declaration = (CompilationUnitSyntax)ctx.Node;
-        if (ctx.SemanticModel.GetDeclaredSymbol(declaration, cancellationToken) is not IAssemblySymbol symbol)
-            return null;
-
+        var symbol = ctx.SemanticModel.Compilation.Assembly;
         return HasAttribute(symbol, MapperGenerator.MapperDefaultsAttributeName) ? symbol : null;
     }
 
@@ -55,13 +52,12 @@ internal static class SyntaxProvider
     {
         return symbol
             .GetAttributes()
-            .Any(
-                x =>
-                    string.Equals(
-                        x.AttributeClass?.ToDisplayString(_fullyQualifiedFormatWithoutGlobal),
-                        attributeName,
-                        StringComparison.Ordinal
-                    )
+            .Any(x =>
+                string.Equals(
+                    x.AttributeClass?.ToDisplayString(_fullyQualifiedFormatWithoutGlobal),
+                    attributeName,
+                    StringComparison.Ordinal
+                )
             );
     }
 }

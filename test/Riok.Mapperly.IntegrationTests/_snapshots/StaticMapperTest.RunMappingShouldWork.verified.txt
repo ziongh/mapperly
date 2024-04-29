@@ -28,7 +28,7 @@
     CtorValue: 5,
     CtorValue2: 100,
     RequiredValue: 4,
-    StringValue: ,
+    StringValue: +after-map,
     RenamedStringValue2: ,
     Unflattening: {},
     NestedNullableTargetNotNullable: {},
@@ -47,20 +47,31 @@
     EnumValue: DtoValue1,
     EnumName: Value30,
     EnumStringValue: 0,
-    EnumReverseStringValue: DtoValue3
+    EnumReverseStringValue: DtoValue3,
+    FormattedIntValue: ,
+    FormattedDateValue: ,
+    ExposePrivateValue: 26
   },
   SourceTargetSameObjectType: {
     CtorValue: 8,
     CtorValue2: 100,
     IntValue: 99,
     RequiredValue: 98,
+    UnmappedValue: 10,
     StringValue: ,
     RenamedStringValue: ,
     Flattening: {},
+    NestedMember: {
+      NestedMemberId: 123,
+      NestedMemberObject: {
+        IntValue: 223
+      }
+    },
     ImmutableArrayValue: null,
     ImmutableQueueValue: [],
     ImmutableStackValue: [],
-    EnumReverseStringValue: 
+    EnumReverseStringValue: ,
+    ExposePrivateValue: 19
   },
   NullableReadOnlyObjectCollection: [
     {
@@ -175,5 +186,8 @@
     BaseIntValue: 1
   },
   DateTimeValueTargetDateOnly: 2020-01-03,
-  DateTimeValueTargetTimeOnly: 3:10 PM
+  DateTimeValueTargetTimeOnly: 3:10 PM,
+  FormattedIntValue: ,
+  FormattedDateValue: ,
+  ExposePrivateValue: 28
 }

@@ -11,21 +11,21 @@ internal static class ExternalMappingsExtractor
 {
     public static IEnumerable<IUserMapping> ExtractExternalMappings(SimpleMappingBuilderContext ctx, INamedTypeSymbol mapperSymbol)
     {
-        var staticExternalMappers = ctx.AttributeAccessor
-            .Access<UseStaticMapperAttribute, UseStaticMapperConfiguration>(mapperSymbol)
+        var staticExternalMappers = ctx
+            .AttributeAccessor.Access<UseStaticMapperAttribute, UseStaticMapperConfiguration>(mapperSymbol)
             .Concat(ctx.AttributeAccessor.Access<UseStaticMapperAttribute<object>, UseStaticMapperConfiguration>(mapperSymbol))
-            .SelectMany(
-                x =>
-                    UserMethodMappingExtractor.ExtractUserImplementedMappings(
-                        ctx,
-                        x.MapperType,
-                        x.MapperType.FullyQualifiedIdentifierName(),
-                        true
-                    )
+            .SelectMany(x =>
+                UserMethodMappingExtractor.ExtractUserImplementedMappings(
+                    ctx,
+                    x.MapperType,
+                    receiver: x.MapperType.FullyQualifiedIdentifierName(),
+                    isStatic: true,
+                    isExternal: true
+                )
             );
 
-        var externalInstanceMappers = ctx.SymbolAccessor
-            .GetAllMembers(mapperSymbol)
+        var externalInstanceMappers = ctx
+            .SymbolAccessor.GetAllMembers(mapperSymbol)
             .Where(x => ctx.AttributeAccessor.HasAttribute<UseMapperAttribute>(x))
             .SelectMany(x => ValidateAndExtractExternalInstanceMappings(ctx, x));
 
@@ -45,7 +45,7 @@ internal static class ExternalMappingsExtractor
             return Enumerable.Empty<IUserMapping>();
 
         if (nullableAnnotation != NullableAnnotation.Annotated)
-            return UserMethodMappingExtractor.ExtractUserImplementedMappings(ctx, type, name, false);
+            return UserMethodMappingExtractor.ExtractUserImplementedMappings(ctx, type, name, isStatic: false, isExternal: true);
 
         ctx.ReportDiagnostic(DiagnosticDescriptors.ExternalMapperMemberCannotBeNullable, symbol, symbol.ToDisplayString());
         return Enumerable.Empty<IUserMapping>();

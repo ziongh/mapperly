@@ -3,7 +3,6 @@ using Riok.Mapperly.Diagnostics;
 
 namespace Riok.Mapperly.Tests.Mapping;
 
-[UsesVerify]
 public class DictionaryTest
 {
     [Fact]
@@ -24,16 +23,7 @@ public class DictionaryTest
         TestHelper
             .GenerateMapper(source)
             .Should()
-            .HaveSingleMethodBody(
-                """
-                var target = new global::System.Collections.Generic.Dictionary<string, long>(source.Count);
-                foreach (var item in source)
-                {
-                    target[item.Key] = item.Value;
-                }
-                return target;
-                """
-            );
+            .HaveSingleMethodBody("return new global::System.Collections.Generic.Dictionary<string, long>(source);");
     }
 
     [Fact]
@@ -126,16 +116,7 @@ public class DictionaryTest
         TestHelper
             .GenerateMapper(source)
             .Should()
-            .HaveSingleMethodBody(
-                """
-                var target = new global::System.Collections.Generic.Dictionary<string, int>();
-                foreach (var item in source)
-                {
-                    target[item.Key] = item.Value;
-                }
-                return target;
-                """
-            );
+            .HaveSingleMethodBody("return new global::System.Collections.Generic.Dictionary<string, int>(source);");
     }
 
     [Fact]
@@ -145,16 +126,7 @@ public class DictionaryTest
         TestHelper
             .GenerateMapper(source)
             .Should()
-            .HaveSingleMethodBody(
-                """
-                var target = new global::System.Collections.Generic.Dictionary<string, int>(source.Count);
-                foreach (var item in source)
-                {
-                    target[item.Key] = item.Value;
-                }
-                return target;
-                """
-            );
+            .HaveSingleMethodBody("return new global::System.Collections.Generic.Dictionary<string, int>(source);");
     }
 
     [Fact]
@@ -164,16 +136,7 @@ public class DictionaryTest
         TestHelper
             .GenerateMapper(source)
             .Should()
-            .HaveSingleMethodBody(
-                """
-                var target = new global::System.Collections.Generic.Dictionary<string, int>(source.Count);
-                foreach (var item in source)
-                {
-                    target[item.Key] = item.Value;
-                }
-                return target;
-                """
-            );
+            .HaveSingleMethodBody("return new global::System.Collections.Generic.Dictionary<string, int>(source);");
     }
 
     [Fact]
@@ -200,7 +163,11 @@ public class DictionaryTest
     public void DictionaryToCustomDictionaryWithObjectFactory()
     {
         var source = TestSourceBuilder.MapperWithBodyAndTypes(
-            "[ObjectFactory] A CreateA() => new();" + "partial A Map(IDictionary<string, int> source);",
+            """
+            [ObjectFactory]
+            A CreateA() => new();
+            partial A Map(IDictionary<string, int> source);
+            """,
             "class A : Dictionary<string, int> {}"
         );
         TestHelper
@@ -258,6 +225,34 @@ public class DictionaryTest
                 }
                 """
             );
+    }
+
+    [Fact]
+    public Task DictionaryWithList()
+    {
+        var source = TestSourceBuilder.Mapping(
+            "A",
+            "B",
+            "record A(Dictionary<int, List<C>> Dict);",
+            "record B(Dictionary<int, List<D>> Dict);",
+            "record C(int Value);",
+            "record D(int Value);"
+        );
+        return TestHelper.VerifyGenerator(source);
+    }
+
+    [Fact]
+    public Task CustomDictionaryWithList()
+    {
+        var source = TestSourceBuilder.Mapping(
+            "A",
+            "B",
+            "class A : Dictionary<int, List<C>>;",
+            "class B : Dictionary<int, List<D>>;",
+            "record C(int Value);",
+            "record D(int Value);"
+        );
+        return TestHelper.VerifyGenerator(source);
     }
 
     [Fact]
@@ -390,7 +385,11 @@ public class DictionaryTest
     public void DictionaryToExplicitDictionaryWithObjectFactoryShouldCast()
     {
         var source = TestSourceBuilder.MapperWithBodyAndTypes(
-            "[ObjectFactory] A CreateA() => new();" + "partial A Map(Dictionary<string, string> source);",
+            """
+            [ObjectFactory]
+            A CreateA() => new();
+            partial A Map(Dictionary<string, string> source);
+            """,
             """
             public class A : IDictionary<string, string>
             {
@@ -423,7 +422,11 @@ public class DictionaryTest
     public void DictionaryToImplicitDictionaryWithObjectFactoryShouldNotCast()
     {
         var source = TestSourceBuilder.MapperWithBodyAndTypes(
-            "[ObjectFactory] A CreateA() => new();" + "partial A Map(Dictionary<string, string> source);",
+            """
+            [ObjectFactory]
+            A CreateA() => new();
+            partial A Map(Dictionary<string, string> source);
+            """,
             """
             public class A : IDictionary<string, string>
             {
@@ -525,5 +528,40 @@ public class DictionaryTest
                 return target;
                 """
             );
+    }
+
+    [Fact]
+    public Task DictionaryShouldReuseForReadOnlyDictionaryImplementorsButDifferentForIDictionary()
+    {
+        var source = TestSourceBuilder.MapperWithBodyAndTypes(
+            """
+            public partial BDictionary Map(ADictionary source);
+            public partial BDictionaryAgain Map(ADictionaryAgain source);
+            public partial BReadOnlyDictionary Map(ADictionary source);
+            public partial BCustomDictionary Map(ADictionary source);
+            public partial BDictionary Map(ADictionary source);g
+            public partial BReadOnlyDictionary Map(AReadOnlyDictionary source);
+            public partial BCustomDictionary Map(ACustomReadOnlyDictionary source);
+            public partial BDictionary Map(ADictionary source);
+            public partial BCustomDictionary Map(ACustomDictionary source);
+            """,
+            "record ADictionary(Dictionary<int, C> Values);",
+            "record ADictionaryAgain(Dictionary<int, C> Values);",
+            "record AReadOnlyDictionary(IReadOnlyDictionary<int, C> Values);",
+            "record ACustomReadOnlyDictionary(CustomReadOnlyDictionary<C> Values);",
+            "record ADictionary(IDictionary<int, C> Values);",
+            "record ACustomDictionary(CustomDictionary<C> Values);",
+            "record BDictionary(Dictionary<int, D> Values);",
+            "record BDictionaryAgain(Dictionary<int, D> Values);",
+            "record BReadOnlyDictionary(IReadOnlyDictionary<int, D> Values);",
+            "record BDictionary(IDictionary<int, D> Values);",
+            "record BCustomDictionary(CustomDictionary<D> Values);",
+            "public class CustomReadOnlyDictionary<T> : IReadOnlyDictionary<int, T>;",
+            "public class CustomDictionary<T> : IDictionary<int, T>;",
+            "record C(int Value);",
+            "record D(int Value);"
+        );
+
+        return TestHelper.VerifyGenerator(source);
     }
 }

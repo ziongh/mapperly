@@ -1,6 +1,5 @@
-﻿namespace Riok.Mapperly.Tests.Mapping;
+namespace Riok.Mapperly.Tests.Mapping;
 
-[UsesVerify]
 public class DateTimeTest
 {
     [Fact]

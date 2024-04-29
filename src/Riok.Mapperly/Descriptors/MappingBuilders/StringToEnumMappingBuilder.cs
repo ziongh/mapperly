@@ -9,7 +9,7 @@ namespace Riok.Mapperly.Descriptors.MappingBuilders;
 
 public static class StringToEnumMappingBuilder
 {
-    public static NewInstanceMapping? TryBuildMapping(MappingBuilderContext ctx)
+    public static INewInstanceMapping? TryBuildMapping(MappingBuilderContext ctx)
     {
         if (!ctx.IsConversionEnabled(MappingConversionType.StringToEnum))
             return null;
@@ -17,8 +17,8 @@ public static class StringToEnumMappingBuilder
         if (ctx.Source.SpecialType != SpecialType.System_String || !ctx.Target.IsEnum())
             return null;
 
-        var genericEnumParseMethodSupported = ctx.Types
-            .Get<Enum>()
+        var genericEnumParseMethodSupported = ctx
+            .Types.Get<Enum>()
             .GetMembers(nameof(Enum.Parse))
             .OfType<IMethodSymbol>()
             .Any(x => x.IsGenericMethod);

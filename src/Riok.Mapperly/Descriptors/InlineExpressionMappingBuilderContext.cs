@@ -1,8 +1,10 @@
 using Microsoft.CodeAnalysis;
 using Riok.Mapperly.Abstractions;
+using Riok.Mapperly.Descriptors.MappingBuilders;
 using Riok.Mapperly.Descriptors.Mappings;
 using Riok.Mapperly.Descriptors.Mappings.ExistingTarget;
 using Riok.Mapperly.Descriptors.Mappings.UserMappings;
+using Riok.Mapperly.Diagnostics;
 using Riok.Mapperly.Helpers;
 
 namespace Riok.Mapperly.Descriptors;
@@ -13,36 +15,17 @@ namespace Riok.Mapperly.Descriptors;
 /// </summary>
 public class InlineExpressionMappingBuilderContext : MappingBuilderContext
 {
-    private readonly MappingCollection _inlineExpressionMappings;
-    private readonly MappingBuilderContext _parentContext;
-
-    public InlineExpressionMappingBuilderContext(MappingBuilderContext ctx, ITypeSymbol sourceType, ITypeSymbol targetType)
-        : this(ctx, (ctx.FindMapping(sourceType, targetType) as IUserMapping)?.Method, sourceType, targetType) { }
-
-    private InlineExpressionMappingBuilderContext(
-        MappingBuilderContext ctx,
-        IMethodSymbol? userSymbol,
-        ITypeSymbol source,
-        ITypeSymbol target
-    )
-        : base(ctx, userSymbol, source, target, false)
-    {
-        _parentContext = ctx;
-        _inlineExpressionMappings = new MappingCollection();
-    }
+    public InlineExpressionMappingBuilderContext(MappingBuilderContext ctx, TypeMappingKey mappingKey)
+        : base(ctx, (ctx.FindMapping(mappingKey) as IUserMapping)?.Method, null, mappingKey, false) { }
 
     private InlineExpressionMappingBuilderContext(
         InlineExpressionMappingBuilderContext ctx,
         IMethodSymbol? userSymbol,
-        ITypeSymbol source,
-        ITypeSymbol target,
-        bool clearDerivedTypes
+        Location? diagnosticLocation,
+        TypeMappingKey mappingKey,
+        bool ignoreDerivedTypes
     )
-        : base(ctx, userSymbol, source, target, clearDerivedTypes)
-    {
-        _parentContext = ctx;
-        _inlineExpressionMappings = ctx._inlineExpressionMappings;
-    }
+        : base(ctx, userSymbol, diagnosticLocation, mappingKey, ignoreDerivedTypes) { }
 
     public override bool IsExpression => true;
 
@@ -55,66 +38,120 @@ public class InlineExpressionMappingBuilderContext : MappingBuilderContext
         && base.IsConversionEnabled(conversionType);
 
     /// <summary>
-    /// Tries to find an existing mapping for the provided types.
-    /// The nullable annotation of reference types is ignored and always set to non-nullable.
+    /// <inheritdoc cref="MappingBuilderContext.FindNamedMapping"/>
     /// Only inline expression mappings and user implemented mappings are considered.
+    /// User implemented mappings are tried to be inlined.
     /// </summary>
-    /// <param name="sourceType">The source type.</param>
-    /// <param name="targetType">The target type.</param>
-    /// <returns>The <see cref="INewInstanceMapping"/> if a mapping was found or <c>null</c> if none was found.</returns>
-    public override INewInstanceMapping? FindMapping(ITypeSymbol sourceType, ITypeSymbol targetType)
+    public override INewInstanceMapping? FindNamedMapping(string mappingName)
     {
-        if (_inlineExpressionMappings.Find(sourceType, targetType) is { } mapping)
-            return mapping;
-
-        // User implemented mappings are also taken into account.
-        // This works as long as the user implemented methods
-        // follow the expression tree limitations:
-        // https://learn.microsoft.com/en-us/dotnet/csharp/advanced-topics/expression-trees/#limitations
-        if (_parentContext.FindMapping(sourceType, targetType) is UserImplementedMethodMapping userMapping)
+        var mapping = InlinedMappings.FindNamed(mappingName, out var ambiguousName, out var isInlined);
+        if (mapping == null)
         {
-            _inlineExpressionMappings.Add(userMapping);
-            return userMapping;
+            // resolve named but not yet discovered mappings
+            mapping = base.FindNamedMapping(mappingName);
+            isInlined = false;
+
+            if (mapping == null)
+                return null;
+        }
+        else if (ambiguousName)
+        {
+            ReportDiagnostic(DiagnosticDescriptors.ReferencedMappingAmbiguous, mappingName);
         }
 
-        return null;
+        if (isInlined)
+            return mapping;
+
+        mapping = TryInlineMapping(mapping);
+        InlinedMappings.SetInlinedMapping(mappingName, mapping);
+        return mapping;
     }
 
     /// <summary>
-    /// Always builds a new mapping with the user symbol of the first user defined mapping method for the provided types
-    /// or no user symbol if no user defined mapping is available unless if this <see cref="InlineExpressionMappingBuilderContext"/>
-    /// already built a mapping for the specified types, then this mapping is reused.
+    /// Tries to find an existing mapping for the provided types + config.
     /// The nullable annotation of reference types is ignored and always set to non-nullable.
-    /// This ensures, the configuration of the user defined method is reused.
-    /// <seealso cref="MappingBuilderContext.FindOrBuildMapping"/>
+    /// Only inline expression mappings and user implemented mappings are considered.
+    /// User implemented mappings are tried to be inlined.
     /// </summary>
-    /// <param name="sourceType">The source type.</param>
-    /// <param name="targetType">The target type.</param>
-    /// <param name="options">The options, <see cref="MappingBuildingOptions.MarkAsReusable"/> is ignored.</param>
-    /// <returns></returns>
-    public override INewInstanceMapping? FindOrBuildMapping(
-        ITypeSymbol sourceType,
-        ITypeSymbol targetType,
-        MappingBuildingOptions options = MappingBuildingOptions.Default
-    )
+    /// <param name="mappingKey">The mapping key.</param>
+    /// <returns>The <see cref="INewInstanceMapping"/> if a mapping was found or <c>null</c> if none was found.</returns>
+    public override INewInstanceMapping? FindMapping(TypeMappingKey mappingKey)
     {
-        sourceType = sourceType.UpgradeNullable();
-        targetType = targetType.UpgradeNullable();
-        var mapping = FindMapping(sourceType, targetType);
-        if (mapping != null)
+        var mapping = InlinedMappings.Find(mappingKey, out var isInlined);
+        if (mapping == null)
+            return null;
+
+        if (isInlined)
             return mapping;
 
+        mapping = TryInlineMapping(mapping);
+        InlinedMappings.SetInlinedMapping(mappingKey, mapping);
+        return mapping;
+    }
+
+    public INewInstanceMapping? FindNewInstanceMapping(IMethodSymbol method)
+    {
+        INewInstanceMapping? mapping = InlinedMappings.FindNewInstanceUserMapping(method, out var isInlined);
+        if (mapping == null)
+            return null;
+
+        if (isInlined)
+            return mapping;
+
+        mapping = TryInlineMapping(mapping);
+        InlinedMappings.SetInlinedMapping(new TypeMappingKey(mapping), mapping);
+        return mapping;
+    }
+
+    /// <summary>
+    /// Builds a new mapping but always uses the user symbol of the default defined mapping (if it is a user mapping)
+    /// or no user symbol if no user default mapping exists.
+    /// <seealso cref="MappingBuilderContext.BuildMapping"/>
+    /// </summary>
+    /// <param name="mappingKey">The mapping key.</param>
+    /// <param name="options">The options, <see cref="MappingBuildingOptions.MarkAsReusable"/> is ignored.</param>
+    /// <param name="diagnosticLocation">The updated to location where to report diagnostics if a new mapping is being built.</param>
+    /// <returns>The created mapping, or <c>null</c> if no mapping could be created.</returns>
+    public override INewInstanceMapping? BuildMapping(
+        TypeMappingKey mappingKey,
+        MappingBuildingOptions options = MappingBuildingOptions.Default,
+        Location? diagnosticLocation = null
+    )
+    {
         var userSymbol = options.HasFlag(MappingBuildingOptions.KeepUserSymbol) ? UserSymbol : null;
 
-        userSymbol ??= (MappingBuilder.Find(sourceType, targetType) as IUserMapping)?.Method;
+        // inline expression mappings don't reuse the user-defined mappings directly
+        // but to apply the same configurations the default mapping user symbol is used
+        // if there is no other user symbol.
+        // this makes sure the configuration of the default mapping user symbol is used
+        // for inline expression mappings.
+        // This is not needed for regular mappings as these user defined method mappings
+        // are directly built (with KeepUserSymbol) and called by the other mappings.
+        userSymbol ??= (MappingBuilder.Find(mappingKey) as IUserMapping)?.Method;
+        options &= ~MappingBuildingOptions.KeepUserSymbol;
+        return BuildMapping(userSymbol, mappingKey, options, diagnosticLocation);
+    }
 
-        // unset MarkAsReusable and KeepUserSymbol as they have special handling for inline mappings
-        options &= ~(MappingBuildingOptions.MarkAsReusable | MappingBuildingOptions.KeepUserSymbol);
+    protected override INewInstanceMapping? BuildMapping(
+        IMethodSymbol? userSymbol,
+        TypeMappingKey mappingKey,
+        MappingBuildingOptions options,
+        Location? diagnosticLocation
+    )
+    {
+        // unset mark as reusable as an inline expression mapping
+        // should never be reused by the default mapping builder context,
+        // only by other inline mapping builder contexts.
+        var reusable = options.HasFlag(MappingBuildingOptions.MarkAsReusable);
+        options &= ~MappingBuildingOptions.MarkAsReusable;
 
-        mapping = BuildMapping(userSymbol, sourceType, targetType, options);
-        if (mapping != null)
+        var mapping = base.BuildMapping(userSymbol, mappingKey, options, diagnosticLocation);
+        if (mapping == null)
+            return null;
+
+        if (reusable)
         {
-            _inlineExpressionMappings.Add(mapping);
+            InlinedMappings.AddMapping(mapping, mappingKey.Configuration);
         }
 
         return mapping;
@@ -123,26 +160,22 @@ public class InlineExpressionMappingBuilderContext : MappingBuilderContext
     /// <summary>
     /// Existing target instance mappings are not supported.
     /// </summary>
-    /// <param name="sourceType">The source type, ignored.</param>
-    /// <param name="targetType">The target type, ignored.</param>
+    /// <param name="mappingKey">The mapping key, ignored.</param>
     /// <param name="options">The options to build a new mapping, ignored.</param>
     /// <returns><c>null</c></returns>
     public override IExistingTargetMapping? FindOrBuildExistingTargetMapping(
-        ITypeSymbol sourceType,
-        ITypeSymbol targetType,
+        TypeMappingKey mappingKey,
         MappingBuildingOptions options = MappingBuildingOptions.Default
     ) => null;
 
     /// <summary>
     /// Existing target instance mappings are not supported.
     /// </summary>
-    /// <param name="sourceType">The source type, ignored.</param>
-    /// <param name="targetType">The target type, ignored.</param>
+    /// <param name="mappingKey">The mapping key, ignored.</param>
     /// <param name="options">The options to build a new mapping, ignored.</param>
     /// <returns><c>null</c></returns>
     public override IExistingTargetMapping? BuildExistingTargetMapping(
-        ITypeSymbol sourceType,
-        ITypeSymbol targetType,
+        TypeMappingKey mappingKey,
         MappingBuildingOptions options = MappingBuildingOptions.Default
     ) => null;
 
@@ -151,15 +184,38 @@ public class InlineExpressionMappingBuilderContext : MappingBuilderContext
 
     protected override MappingBuilderContext ContextForMapping(
         IMethodSymbol? userSymbol,
-        ITypeSymbol sourceType,
-        ITypeSymbol targetType,
-        MappingBuildingOptions options
-    ) =>
-        new InlineExpressionMappingBuilderContext(
+        TypeMappingKey mappingKey,
+        MappingBuildingOptions options,
+        Location? diagnosticLocation = null
+    )
+    {
+        return new InlineExpressionMappingBuilderContext(
             this,
             userSymbol,
-            sourceType,
-            targetType,
-            options.HasFlag(MappingBuildingOptions.ClearDerivedTypes)
+            diagnosticLocation,
+            mappingKey,
+            options.HasFlag(MappingBuildingOptions.IgnoreDerivedTypes)
         );
+    }
+
+    private INewInstanceMapping TryInlineMapping(INewInstanceMapping mapping)
+    {
+        return mapping switch
+        {
+            // inline existing mapping
+            UserImplementedMethodMapping implementedMapping
+                => InlineExpressionMappingBuilder.TryBuildMapping(this, implementedMapping) ?? implementedMapping,
+
+            // build an inlined version
+            IUserMapping userMapping
+                => BuildMapping(
+                    userMapping.Method,
+                    new TypeMappingKey(userMapping),
+                    MappingBuildingOptions.Default,
+                    userMapping.Method.GetSyntaxLocation()
+                ) ?? mapping,
+
+            _ => mapping,
+        };
+    }
 }

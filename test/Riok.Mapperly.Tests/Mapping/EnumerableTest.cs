@@ -3,7 +3,6 @@ using Riok.Mapperly.Diagnostics;
 
 namespace Riok.Mapperly.Tests.Mapping;
 
-[UsesVerify]
 public class EnumerableTest
 {
     [Fact]
@@ -64,14 +63,14 @@ public class EnumerableTest
     [Fact]
     public void ArrayCustomClassToArrayCustomClass()
     {
-        var source = TestSourceBuilder.Mapping("B[]", "B[]", "class B { public int Value {get; set; }}");
+        var source = TestSourceBuilder.Mapping("B[]", "B[]", "class B { public int Value { get; set; } }");
         TestHelper.GenerateMapper(source).Should().HaveSingleMethodBody("return source;");
     }
 
     [Fact]
     public void ArrayCustomClassNullableToArrayCustomClassNonNullable()
     {
-        var source = TestSourceBuilder.Mapping("B?[]", "B[]", "class B { public int Value {get; set; }}");
+        var source = TestSourceBuilder.Mapping("B?[]", "B[]", "class B { public int Value { get; set; } }");
         TestHelper
             .GenerateMapper(source)
             .Should()
@@ -90,7 +89,7 @@ public class EnumerableTest
     [Fact]
     public void ArrayCustomClassNonNullableToArrayCustomClassNullable()
     {
-        var source = TestSourceBuilder.Mapping("B[]", "B?[]", "class B { public int Value {get; set; }}");
+        var source = TestSourceBuilder.Mapping("B[]", "B?[]", "class B { public int Value { get; set; } }");
         TestHelper.GenerateMapper(source).Should().HaveSingleMethodBody("return (global::B?[])source;");
     }
 
@@ -551,6 +550,13 @@ public class EnumerableTest
     }
 
     [Fact]
+    public Task ShouldUpgradeNullabilityOfGenericInDisabledNullableContext()
+    {
+        var source = TestSourceBuilder.Mapping("IList<A>", "IList<B>", "record A(int V);", "record B(int V);");
+        return TestHelper.VerifyGenerator(source, TestHelperOptions.DisabledNullable);
+    }
+
+    [Fact]
     public Task ArrayToCollectionShouldUpgradeNullability()
     {
         var source = TestSourceBuilder.Mapping(
@@ -558,6 +564,27 @@ public class EnumerableTest
             "B",
             "class A { public int[] Value { get; set;} }",
             "class B { public ICollection<string> Value { get; set; } }"
+        );
+
+        return TestHelper.VerifyGenerator(source, TestHelperOptions.DisabledNullable);
+    }
+
+    [Fact]
+    public Task ArrayToList()
+    {
+        var source = TestSourceBuilder.Mapping("int[]", "List<string>");
+
+        return TestHelper.VerifyGenerator(source);
+    }
+
+    [Fact]
+    public Task ArrayToListShouldUpgradeNullability()
+    {
+        var source = TestSourceBuilder.Mapping(
+            "A",
+            "B",
+            "class A { public int[] Value { get; set;} }",
+            "class B { public List<string> Value { get; set; } }"
         );
 
         return TestHelper.VerifyGenerator(source, TestHelperOptions.DisabledNullable);
@@ -692,5 +719,40 @@ public class EnumerableTest
                 """
             )
             .HaveDiagnostic(DiagnosticDescriptors.CannotMapToReadOnlyMember);
+    }
+
+    [Fact]
+    public Task EnumerableShouldReuseForReadOnlyCollectionImplementorsButDifferentForICollection()
+    {
+        var source = TestSourceBuilder.MapperWithBodyAndTypes(
+            """
+            public partial BList Map(AList source);
+            public partial BListAgain Map(AListAgain source);
+            public partial BReadOnlyCollection Map(AList source);
+            public partial BCustomCollection Map(AList source);
+            public partial BCollection Map(AList source);g
+            public partial BReadOnlyCollection Map(AReadOnlyCollection source);
+            public partial BCustomCollection Map(ACustomReadOnlyCollection source);
+            public partial BCollection Map(ACollection source);
+            public partial BCustomCollection Map(ACustomCollection source);
+            """,
+            "record AList(List<C> Values);",
+            "record AListAgain(List<C> Values);",
+            "record AReadOnlyCollection(IReadOnlyCollection<C> Values);",
+            "record ACustomReadOnlyCollection(CustomReadOnlyCollection<C> Values);",
+            "record ACollection(ICollection<C> Values);",
+            "record ACustomCollection(CustomCollection<C> Values);",
+            "record BList(List<D> Values);",
+            "record BListAgain(List<D> Values);",
+            "record BReadOnlyCollection(IReadOnlyCollection<D> Values);",
+            "record BCollection(ICollection<D> Values);",
+            "record BCustomCollection(CustomCollection<D> Values);",
+            "public class CustomReadOnlyCollection<T> : IReadOnlyCollection<T> { public void Add(T item) {} }",
+            "public class CustomCollection<T> : ICollection<T> { public void Add(T item) {} }",
+            "record C(int Value);",
+            "record D(int Value);"
+        );
+
+        return TestHelper.VerifyGenerator(source);
     }
 }

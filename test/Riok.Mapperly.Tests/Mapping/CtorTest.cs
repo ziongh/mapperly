@@ -13,6 +13,20 @@ public class CtorTest
     }
 
     [Fact]
+    public void CtorCustomClassNullableParameter()
+    {
+        var source = TestSourceBuilder.Mapping("string", "A", "class A { public A(string? x) {} }");
+        TestHelper.GenerateMapper(source).Should().HaveSingleMethodBody("return new global::A(source);");
+    }
+
+    [Fact]
+    public void CtorCustomClassNullablePrimitiveParameter()
+    {
+        var source = TestSourceBuilder.Mapping("int", "A", "class A { public A(int? x) {} }");
+        TestHelper.GenerateMapper(source).Should().HaveSingleMethodBody("return new global::A(source);");
+    }
+
+    [Fact]
     public void CtorCustomStruct()
     {
         var source = TestSourceBuilder.Mapping("string", "A", "struct A { public A(string x) {} }");
@@ -61,6 +75,35 @@ public class CtorTest
                 """
                 var target = new global::A();
                 target.Value = source.Value;
+                return target;
+                """
+            );
+    }
+
+    [Fact]
+    public void MapPropertyCtorMapping()
+    {
+        var source = TestSourceBuilder.MapperWithBodyAndTypes(
+            """
+            [MapProperty(nameof(A.BId), nameof(B.Id))]
+            private partial B Map(A source);
+            """,
+            "class A { public long BId { get; } }",
+            """
+            class B
+            {
+                public long Id { get; }
+
+                public B(long id) { Id = id; }
+            }
+            """
+        );
+        TestHelper
+            .GenerateMapper(source)
+            .Should()
+            .HaveSingleMethodBody(
+                """
+                var target = new global::B(source.BId);
                 return target;
                 """
             );

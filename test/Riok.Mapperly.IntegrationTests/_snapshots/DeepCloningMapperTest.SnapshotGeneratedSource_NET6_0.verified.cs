@@ -4,6 +4,7 @@ namespace Riok.Mapperly.IntegrationTests.Mapper
 {
     public static partial class DeepCloningMapper
     {
+        [global::System.CodeDom.Compiler.GeneratedCode("Riok.Mapperly", "0.0.1.0")]
         public static partial global::Riok.Mapperly.IntegrationTests.Models.IdObject Copy(global::Riok.Mapperly.IntegrationTests.Models.IdObject src)
         {
             var target = new global::Riok.Mapperly.IntegrationTests.Models.IdObject();
@@ -11,6 +12,7 @@ namespace Riok.Mapperly.IntegrationTests.Mapper
             return target;
         }
 
+        [global::System.CodeDom.Compiler.GeneratedCode("Riok.Mapperly", "0.0.1.0")]
         public static partial global::Riok.Mapperly.IntegrationTests.Models.TestObject Copy(global::Riok.Mapperly.IntegrationTests.Models.TestObject src)
         {
             var target = new global::Riok.Mapperly.IntegrationTests.Models.TestObject(src.CtorValue, ctorValue2: src.CtorValue2)
@@ -22,33 +24,73 @@ namespace Riok.Mapperly.IntegrationTests.Mapper
             {
                 target.NullableFlattening = Copy(src.NullableFlattening);
             }
+            else
+            {
+                target.NullableFlattening = null;
+            }
             if (src.NestedNullable != null)
             {
                 target.NestedNullable = MapToTestObjectNested(src.NestedNullable);
+            }
+            else
+            {
+                target.NestedNullable = null;
             }
             if (src.NestedNullableTargetNotNullable != null)
             {
                 target.NestedNullableTargetNotNullable = MapToTestObjectNested(src.NestedNullableTargetNotNullable);
             }
+            else
+            {
+                target.NestedNullableTargetNotNullable = null;
+            }
+            if (src.NestedMember != null)
+            {
+                target.NestedMember = MapToTestObjectNestedMember(src.NestedMember);
+            }
+            else
+            {
+                target.NestedMember = null;
+            }
             if (src.TupleValue != null)
             {
-                target.TupleValue = MapToValueTuple(src.TupleValue.Value);
+                target.TupleValue = MapToValueTupleOfStringAndString(src.TupleValue.Value);
+            }
+            else
+            {
+                target.TupleValue = null;
             }
             if (src.RecursiveObject != null)
             {
                 target.RecursiveObject = Copy(src.RecursiveObject);
             }
+            else
+            {
+                target.RecursiveObject = null;
+            }
             if (src.SourceTargetSameObjectType != null)
             {
                 target.SourceTargetSameObjectType = Copy(src.SourceTargetSameObjectType);
             }
+            else
+            {
+                target.SourceTargetSameObjectType = null;
+            }
             if (src.NullableReadOnlyObjectCollection != null)
             {
-                target.NullableReadOnlyObjectCollection = MapToIReadOnlyCollection(src.NullableReadOnlyObjectCollection);
+                target.NullableReadOnlyObjectCollection = MapToTestObjectNestedArray(src.NullableReadOnlyObjectCollection);
+            }
+            else
+            {
+                target.NullableReadOnlyObjectCollection = null;
             }
             if (src.SubObject != null)
             {
                 target.SubObject = MapToInheritanceSubObject(src.SubObject);
+            }
+            else
+            {
+                target.SubObject = null;
             }
             target.IntValue = src.IntValue;
             target.StringValue = src.StringValue;
@@ -95,11 +137,13 @@ namespace Riok.Mapperly.IntegrationTests.Mapper
             target.EnumRawValue = src.EnumRawValue;
             target.EnumStringValue = src.EnumStringValue;
             target.EnumReverseStringValue = src.EnumReverseStringValue;
+            target.DateTimeValue = src.DateTimeValue;
             target.DateTimeValueTargetDateOnly = src.DateTimeValueTargetDateOnly;
             target.DateTimeValueTargetTimeOnly = src.DateTimeValueTargetTimeOnly;
             return target;
         }
 
+        [global::System.CodeDom.Compiler.GeneratedCode("Riok.Mapperly", "0.0.1.0")]
         private static global::Riok.Mapperly.IntegrationTests.Models.TestObjectNested MapToTestObjectNested(global::Riok.Mapperly.IntegrationTests.Models.TestObjectNested source)
         {
             var target = new global::Riok.Mapperly.IntegrationTests.Models.TestObjectNested();
@@ -107,13 +151,31 @@ namespace Riok.Mapperly.IntegrationTests.Mapper
             return target;
         }
 
-        private static (string A, string) MapToValueTuple((string A, string) source)
+        [global::System.CodeDom.Compiler.GeneratedCode("Riok.Mapperly", "0.0.1.0")]
+        private static global::Riok.Mapperly.IntegrationTests.Models.TestObjectNestedMember MapToTestObjectNestedMember(global::Riok.Mapperly.IntegrationTests.Models.TestObjectNestedMember source)
+        {
+            var target = new global::Riok.Mapperly.IntegrationTests.Models.TestObjectNestedMember();
+            if (source.NestedMemberObject != null)
+            {
+                target.NestedMemberObject = MapToTestObjectNested(source.NestedMemberObject);
+            }
+            else
+            {
+                target.NestedMemberObject = null;
+            }
+            target.NestedMemberId = source.NestedMemberId;
+            return target;
+        }
+
+        [global::System.CodeDom.Compiler.GeneratedCode("Riok.Mapperly", "0.0.1.0")]
+        private static (string A, string) MapToValueTupleOfStringAndString((string A, string) source)
         {
             var target = (A: source.A, source.Item2);
             return target;
         }
 
-        private static global::System.Collections.Generic.IReadOnlyCollection<global::Riok.Mapperly.IntegrationTests.Models.TestObjectNested> MapToIReadOnlyCollection(global::System.Collections.Generic.IReadOnlyCollection<global::Riok.Mapperly.IntegrationTests.Models.TestObjectNested> source)
+        [global::System.CodeDom.Compiler.GeneratedCode("Riok.Mapperly", "0.0.1.0")]
+        private static global::Riok.Mapperly.IntegrationTests.Models.TestObjectNested[] MapToTestObjectNestedArray(global::System.Collections.Generic.IReadOnlyCollection<global::Riok.Mapperly.IntegrationTests.Models.TestObjectNested> source)
         {
             var target = new global::Riok.Mapperly.IntegrationTests.Models.TestObjectNested[source.Count];
             var i = 0;
@@ -125,6 +187,7 @@ namespace Riok.Mapperly.IntegrationTests.Mapper
             return target;
         }
 
+        [global::System.CodeDom.Compiler.GeneratedCode("Riok.Mapperly", "0.0.1.0")]
         private static global::Riok.Mapperly.IntegrationTests.Models.InheritanceSubObject MapToInheritanceSubObject(global::Riok.Mapperly.IntegrationTests.Models.InheritanceSubObject source)
         {
             var target = new global::Riok.Mapperly.IntegrationTests.Models.InheritanceSubObject();

@@ -1,28 +1,35 @@
 using Microsoft.CodeAnalysis;
+using Riok.Mapperly.Abstractions;
 using Riok.Mapperly.Abstractions.ReferenceHandling;
 using Riok.Mapperly.Configuration;
 using Riok.Mapperly.Descriptors.ExternalMappings;
+using Riok.Mapperly.Descriptors.FormatProviders;
 using Riok.Mapperly.Descriptors.MappingBodyBuilders;
 using Riok.Mapperly.Descriptors.MappingBuilders;
+using Riok.Mapperly.Descriptors.Mappings.UserMappings;
 using Riok.Mapperly.Descriptors.ObjectFactories;
+using Riok.Mapperly.Diagnostics;
 using Riok.Mapperly.Helpers;
 using Riok.Mapperly.Symbols;
-using Riok.Mapperly.Templates;
 
 namespace Riok.Mapperly.Descriptors;
 
 public class DescriptorBuilder
 {
+    private const string UnsafeAccessorName = "System.Runtime.CompilerServices.UnsafeAccessorAttribute";
+
     private readonly MapperDescriptor _mapperDescriptor;
     private readonly SymbolAccessor _symbolAccessor;
+    private readonly WellKnownTypes _types;
 
     private readonly MappingCollection _mappings = new();
+    private readonly InlinedExpressionMappingCollection _inlineMappings = new();
+
     private readonly MethodNameBuilder _methodNameBuilder = new();
     private readonly MappingBodyBuilder _mappingBodyBuilder;
     private readonly SimpleMappingBuilderContext _builderContext;
-    private readonly List<Diagnostic> _diagnostics = new();
-
-    private ObjectFactoryCollection _objectFactories = ObjectFactoryCollection.Empty;
+    private readonly DiagnosticCollection _diagnostics;
+    private readonly UnsafeAccessorContext _unsafeAccessorContext;
 
     public DescriptorBuilder(
         CompilationContext compilationContext,
@@ -33,33 +40,73 @@ public class DescriptorBuilder
     {
         _mapperDescriptor = new MapperDescriptor(mapperDeclaration, _methodNameBuilder);
         _symbolAccessor = symbolAccessor;
+        _types = compilationContext.Types;
         _mappingBodyBuilder = new MappingBodyBuilder(_mappings);
+        _unsafeAccessorContext = new UnsafeAccessorContext(_methodNameBuilder, symbolAccessor);
 
         var attributeAccessor = new AttributeDataAccessor(symbolAccessor);
+        var configurationReader = new MapperConfigurationReader(
+            attributeAccessor,
+            _types,
+            mapperDeclaration.Symbol,
+            defaultMapperConfiguration
+        );
+        _diagnostics = new DiagnosticCollection(mapperDeclaration.Syntax.GetLocation());
+
         _builderContext = new SimpleMappingBuilderContext(
             compilationContext,
-            new MapperConfigurationReader(attributeAccessor, mapperDeclaration.Symbol, defaultMapperConfiguration),
+            configurationReader,
             _symbolAccessor,
+            new GenericTypeChecker(_symbolAccessor, _types),
             attributeAccessor,
-            _mapperDescriptor,
+            _unsafeAccessorContext,
             _diagnostics,
-            new MappingBuilder(_mappings),
-            new ExistingTargetMappingBuilder(_mappings)
+            new MappingBuilder(_mappings, mapperDeclaration),
+            new ExistingTargetMappingBuilder(_mappings),
+            _inlineMappings,
+            mapperDeclaration.Syntax.GetLocation()
         );
     }
 
-    public (MapperDescriptor descriptor, IReadOnlyCollection<Diagnostic> diagnostics) Build(CancellationToken cancellationToken)
+    public (MapperDescriptor descriptor, DiagnosticCollection diagnostics) Build(CancellationToken cancellationToken)
     {
+        ConfigureMemberVisibility();
         ReserveMethodNames();
-        ExtractObjectFactories();
         ExtractUserMappings();
+
+        // ExtractObjectFactories needs to be called after ExtractUserMappings due to configuring mapperDescriptor.Static
+        var objectFactories = ExtractObjectFactories();
+        var formatProviders = ExtractFormatProviders();
+        EnqueueUserMappings(objectFactories, formatProviders);
         ExtractExternalMappings();
         _mappingBodyBuilder.BuildMappingBodies(cancellationToken);
+        AddUserMappingDiagnostics();
         BuildMappingMethodNames();
-        TemplateResolver.AddRequiredTemplates(_builderContext.MapperConfiguration, _mappings, _mapperDescriptor);
         BuildReferenceHandlingParameters();
         AddMappingsToDescriptor();
+        AddAccessorsToDescriptor();
         return (_mapperDescriptor, _diagnostics);
+    }
+
+    /// <summary>
+    /// If <see cref="MemberVisibility.Accessible"/> is not set and the roslyn version does not have UnsafeAccessors
+    /// then emit a diagnostic and update the <see cref="MemberVisibility"/> for <see cref="SymbolAccessor"/>.
+    /// </summary>
+    private void ConfigureMemberVisibility()
+    {
+        var includedMembers = _builderContext.Configuration.Mapper.IncludedMembers;
+
+        if (_types.TryGet(UnsafeAccessorName) != null)
+        {
+            _symbolAccessor.SetMemberVisibility(includedMembers);
+            return;
+        }
+
+        if (includedMembers.HasFlag(MemberVisibility.Accessible))
+            return;
+
+        _diagnostics.ReportDiagnostic(DiagnosticDescriptors.UnsafeAccessorNotAvailable);
+        _symbolAccessor.SetMemberVisibility(includedMembers | MemberVisibility.Accessible);
     }
 
     private void ReserveMethodNames()
@@ -70,24 +117,55 @@ public class DescriptorBuilder
         }
     }
 
-    private void ExtractObjectFactories()
-    {
-        _objectFactories = ObjectFactoryBuilder.ExtractObjectFactories(_builderContext, _mapperDescriptor.Symbol);
-    }
-
     private void ExtractUserMappings()
     {
+        _mapperDescriptor.Static = _mapperDescriptor.Symbol.IsStatic;
+        IMethodSymbol? firstNonStaticUserMapping = null;
+
         foreach (var userMapping in UserMethodMappingExtractor.ExtractUserMappings(_builderContext, _mapperDescriptor.Symbol))
+        {
+            // if a user defined mapping method is static, all of them need to be static to avoid confusion for mapping method resolution
+            // however, user implemented mapping methods are allowed to be static in a non-static context.
+            // Therefore we are only interested in partial method definitions here.
+            if (userMapping.Method is { IsStatic: true, IsPartialDefinition: true })
+            {
+                _mapperDescriptor.Static = true;
+            }
+            else if (firstNonStaticUserMapping == null && !userMapping.Method.IsStatic)
+            {
+                firstNonStaticUserMapping = userMapping.Method;
+            }
+
+            AddUserMapping(userMapping, false, true);
+        }
+
+        if (_mapperDescriptor.Static && firstNonStaticUserMapping is not null)
+        {
+            _diagnostics.ReportDiagnostic(
+                DiagnosticDescriptors.MixingStaticPartialWithInstanceMethod,
+                firstNonStaticUserMapping,
+                _mapperDescriptor.Symbol.ToDisplayString()
+            );
+        }
+    }
+
+    private ObjectFactoryCollection ExtractObjectFactories()
+    {
+        return ObjectFactoryBuilder.ExtractObjectFactories(_builderContext, _mapperDescriptor.Symbol, _mapperDescriptor.Static);
+    }
+
+    private void EnqueueUserMappings(ObjectFactoryCollection objectFactories, FormatProviderCollection formatProviders)
+    {
+        foreach (var userMapping in _mappings.UserMappings)
         {
             var ctx = new MappingBuilderContext(
                 _builderContext,
-                _objectFactories,
+                objectFactories,
+                formatProviders,
                 userMapping.Method,
-                userMapping.SourceType,
-                userMapping.TargetType
+                new TypeMappingKey(userMapping.SourceType, userMapping.TargetType)
             );
 
-            _mappings.Add(userMapping);
             _mappings.EnqueueToBuildBody(userMapping, ctx);
         }
     }
@@ -96,8 +174,13 @@ public class DescriptorBuilder
     {
         foreach (var externalMapping in ExternalMappingsExtractor.ExtractExternalMappings(_builderContext, _mapperDescriptor.Symbol))
         {
-            _mappings.Add(externalMapping);
+            AddUserMapping(externalMapping, true, false);
         }
+    }
+
+    private FormatProviderCollection ExtractFormatProviders()
+    {
+        return FormatProviderBuilder.ExtractFormatProviders(_builderContext, _mapperDescriptor.Symbol, _mapperDescriptor.Static);
     }
 
     private void BuildMappingMethodNames()
@@ -110,7 +193,7 @@ public class DescriptorBuilder
 
     private void BuildReferenceHandlingParameters()
     {
-        if (!_builderContext.MapperConfiguration.UseReferenceHandling)
+        if (!_builderContext.Configuration.Mapper.UseReferenceHandling)
             return;
 
         foreach (var methodMapping in _mappings.MethodMappings)
@@ -122,9 +205,42 @@ public class DescriptorBuilder
     private void AddMappingsToDescriptor()
     {
         // add generated mappings to the mapper
-        foreach (var mapping in _mappings.MethodMappings)
+        _mapperDescriptor.AddMethodMappings(_mappings.MethodMappings);
+    }
+
+    private void AddAccessorsToDescriptor()
+    {
+        // add generated accessors to the mapper
+        _mapperDescriptor.AddUnsafeAccessors(_unsafeAccessorContext.UnsafeAccessors);
+    }
+
+    private void AddUserMapping(IUserMapping mapping, bool ignoreDuplicates, bool named)
+    {
+        var name = named ? mapping.Method.Name : null;
+        var result = _mappings.AddUserMapping(mapping, name);
+        if (!ignoreDuplicates && mapping.Default == true && result == MappingCollectionAddResult.NotAddedDuplicated)
         {
-            _mapperDescriptor.AddTypeMapping(mapping);
+            _diagnostics.ReportDiagnostic(
+                DiagnosticDescriptors.MultipleDefaultUserMappings,
+                mapping.Method,
+                mapping.SourceType.ToDisplayString(),
+                mapping.TargetType.ToDisplayString()
+            );
+        }
+
+        _inlineMappings.AddUserMapping(mapping, name);
+    }
+
+    private void AddUserMappingDiagnostics()
+    {
+        foreach (var mapping in _mappings.UsedDuplicatedNonDefaultNonReferencedUserMappings)
+        {
+            _diagnostics.ReportDiagnostic(
+                DiagnosticDescriptors.MultipleUserMappingsWithoutDefault,
+                mapping.Method,
+                mapping.SourceType.ToDisplayString(),
+                mapping.TargetType.ToDisplayString()
+            );
         }
     }
 }

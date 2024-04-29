@@ -1,18 +1,13 @@
 namespace Riok.Mapperly.Helpers;
 
-public class UniqueNameBuilder
+public class UniqueNameBuilder()
 {
-    private readonly HashSet<string> _usedNames;
+    private readonly HashSet<string> _usedNames = new(StringComparer.Ordinal);
     private readonly UniqueNameBuilder? _parentScope;
 
-    public UniqueNameBuilder()
-    {
-        _usedNames = new HashSet<string>(StringComparer.Ordinal);
-    }
-
     private UniqueNameBuilder(UniqueNameBuilder parentScope)
+        : this()
     {
-        _usedNames = new HashSet<string>(StringComparer.Ordinal);
         _parentScope = parentScope;
     }
 
@@ -34,6 +29,17 @@ public class UniqueNameBuilder
 
         return uniqueName;
     }
+
+    public string New(string name, IEnumerable<string> reservedNames)
+    {
+        var scope = NewScope();
+        scope.Reserve(reservedNames);
+        var uniqueName = scope.New(name);
+        _usedNames.Add(uniqueName);
+        return uniqueName;
+    }
+
+    private void Reserve(IEnumerable<string> names) => _usedNames.AddRange(names);
 
     private bool Contains(string name)
     {

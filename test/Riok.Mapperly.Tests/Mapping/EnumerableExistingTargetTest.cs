@@ -2,7 +2,6 @@ using Riok.Mapperly.Abstractions;
 
 namespace Riok.Mapperly.Tests.Mapping;
 
-[UsesVerify]
 public class EnumerableExistingTargetTest
 {
     [Fact]
@@ -105,6 +104,27 @@ public class EnumerableExistingTargetTest
                 """
                 var target = new global::B();
                 return target;
+                """
+            );
+    }
+
+    [Fact]
+    public void MapToExistingInitOnlyCollection()
+    {
+        var source = TestSourceBuilder.MapperWithBodyAndTypes(
+            "partial void Map(A source, B target);",
+            "class A { public ICollection<string> Subs { get; } = new List<string>(); }",
+            "class B { public ICollection<string> Subs { get; init; } = new List<string>(); }"
+        );
+        TestHelper
+            .GenerateMapper(source)
+            .Should()
+            .HaveSingleMethodBody(
+                """
+                foreach (var item in source.Subs)
+                {
+                    target.Subs.Add(item);
+                }
                 """
             );
     }

@@ -3,14 +3,12 @@ using Riok.Mapperly.IntegrationTests.Helpers;
 using Riok.Mapperly.IntegrationTests.Mapper;
 using VerifyXunit;
 using Xunit;
-
-#if NET8_0
+#if NET8_0_OR_GREATER
 using FluentAssertions;
 #endif
 
 namespace Riok.Mapperly.IntegrationTests
 {
-    [UsesVerify]
     public class MapperTest : BaseMapperTest
     {
         [Fact]
@@ -22,7 +20,7 @@ namespace Riok.Mapperly.IntegrationTests
         }
 
         [Fact]
-        [VersionedSnapshot(Versions.NET6_0)]
+        [VersionedSnapshot(Versions.NET6_0 | Versions.NET8_0)]
         public Task RunMappingShouldWork()
         {
             var model = NewTestObj();
@@ -30,7 +28,7 @@ namespace Riok.Mapperly.IntegrationTests
             return Verifier.Verify(dto);
         }
 
-#if NET8_0
+#if NET8_0_OR_GREATER
         [Fact]
         public void RunMappingAliasedTuple()
         {

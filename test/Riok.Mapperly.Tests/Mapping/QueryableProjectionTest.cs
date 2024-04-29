@@ -2,7 +2,6 @@ using Riok.Mapperly.Diagnostics;
 
 namespace Riok.Mapperly.Tests.Mapping;
 
-[UsesVerify]
 public class QueryableProjectionTest
 {
     [Fact]
@@ -47,20 +46,53 @@ public class QueryableProjectionTest
     }
 
     [Fact]
+    public Task ClassToClassNestedMemberAttribute()
+    {
+        var source = TestSourceBuilder.MapperWithBodyAndTypes(
+            """
+            partial System.Linq.IQueryable<B> Map(System.Linq.IQueryable<A> source);
+            [MapNestedProperties(nameof(A.Value))] private partial B MapToB(A source);
+            """,
+            "class A { public C Value { get; set; } }",
+            "class B { public int Id { get; set; } }",
+            "class C { public int Id { get; set; } }"
+        );
+
+        return TestHelper.VerifyGenerator(source);
+    }
+
+    [Fact]
     public Task ClassToClassWithConfigs()
     {
         var source = TestSourceBuilder.MapperWithBodyAndTypes(
             """
-                private partial System.Linq.IQueryable<B> Map(System.Linq.IQueryable<A> source);
-                [MapProperty("StringValue", "StringValue2")] private partial B MapToB(A source);
-                [MapProperty("LongValue", "IntValue")] private partial D MapToD(C source);
-                """,
+            private partial System.Linq.IQueryable<B> Map(System.Linq.IQueryable<A> source);
+            [MapProperty("StringValue", "StringValue2")] private partial B MapToB(A source);
+            [MapProperty("LongValue", "IntValue")] private partial D MapToD(C source);
+            """,
             "class A { public string StringValue { get; set; } public C NestedValue { get; set; } }",
             "class B { public string StringValue2 { get; set; } public D NestedValue { get; set; } }",
             "class C { public long LongValue { get; set; } public E NestedValue { get; set; } }",
             "class D { public int IntValue { get; set; } public F NestedValue { get; set; } }",
             "class E { public short ShortValue { get; set; } }",
             "class F { public short ShortValue { get; set; } }"
+        );
+
+        return TestHelper.VerifyGenerator(source);
+    }
+
+    [Fact]
+    public Task QueryablePropertyWithStringFormat()
+    {
+        var source = TestSourceBuilder.MapperWithBodyAndTypes(
+            """
+            partial System.Linq.IQueryable<B> Map(System.Linq.IQueryable<A> source);
+
+            [MapProperty("Value", "Value", StringFormat = "C")]
+            private partial B MapPrivate(A source);",
+            """,
+            "class A { public int Value { get; set; } }",
+            "class B { public string Value { get; init; } }"
         );
 
         return TestHelper.VerifyGenerator(source);
@@ -77,7 +109,7 @@ public class QueryableProjectionTest
             """,
             "record A(Guid Id, List<C> Values);",
             "record B(string Id, List<D> Values);",
-            "enum D(V1, V2, V3);",
+            "record D(int IntValue);",
             "record C(D Value);"
         );
 
@@ -91,7 +123,7 @@ public class QueryableProjectionTest
             """
             private partial System.Linq.IQueryable<B> Map(System.Linq.IQueryable<A> source);
 
-            private partial List<D> Map(List<C> source) => source.Select(x => x.Value).ToList();
+            private partial List<D> Map(List<C> source) => source.Select(x => x.Value).OrderBy(x => x).ToList<D>();
             """,
             "record A(Guid Id, List<C> Values);",
             "record B(string Id, List<D> Values);",
@@ -103,31 +135,13 @@ public class QueryableProjectionTest
     }
 
     [Fact]
-    public Task ClassToClassWithUserImplemented()
-    {
-        var source = TestSourceBuilder.MapperWithBodyAndTypes(
-            """
-                private partial System.Linq.IQueryable<B> Map(System.Linq.IQueryable<A> source);
-
-                private D MapToD(C v) => new D { Value = v.Value + "-mapped" };
-                """,
-            "class A { public string StringValue { get; set; } public C NestedValue { get; set; } }",
-            "class B { public string StringValue { get; set; } public D NestedValue { get; set; } }",
-            "class C { public string Value { get; set; } }",
-            "class D { public string Value { get; set; } }"
-        );
-
-        return TestHelper.VerifyGenerator(source);
-    }
-
-    [Fact]
     public Task ReferenceLoopInitProperty()
     {
         var source = TestSourceBuilder.Mapping(
             "System.Linq.IQueryable<A>",
             "System.Linq.IQueryable<B>",
-            "class A { public A? Parent { get; set; } }",
-            "class B { public B? Parent { get; set; } }"
+            "class A { public A? Parent { get; set; } public int IntValue { get; set; } }",
+            "class B { public B? Parent { get; set; } public int IntValue { get; set; } }"
         );
 
         return TestHelper.VerifyGenerator(source);
@@ -139,8 +153,8 @@ public class QueryableProjectionTest
         var source = TestSourceBuilder.Mapping(
             "System.Linq.IQueryable<A>",
             "System.Linq.IQueryable<B>",
-            "class A { public A? Parent { get; set; } }",
-            "class B { public B(B? parent) {} }"
+            "class A { public A? Parent { get; set; } public int IntValue { get; set; } }",
+            "class B { public B(B? parent) {} public int IntValue { get; set; } }"
         );
 
         return TestHelper.VerifyGenerator(source);

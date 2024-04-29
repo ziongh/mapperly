@@ -64,6 +64,10 @@ public static class CollectionInfoBuilder
         new CollectionTypeInfo(CollectionType.ReadOnlyMemory, typeof(ReadOnlyMemory<>)),
     };
 
+    private static readonly IReadOnlyDictionary<CollectionType, Type> _collectionClrTypeByType = _collectionTypeInfos
+        .Where(x => x.ReflectionType != null)
+        .ToDictionary(x => x.CollectionType, x => x.ReflectionType!);
+
     public static CollectionInfos? Build(
         WellKnownTypes wellKnownTypes,
         SymbolAccessor symbolAccessor,
@@ -86,7 +90,7 @@ public static class CollectionInfoBuilder
         return new CollectionInfos(sourceInfo, targetInfo);
     }
 
-    private static CollectionInfo BuildCollectionInfo(
+    public static CollectionInfo BuildCollectionInfo(
         WellKnownTypes wellKnownTypes,
         SymbolAccessor symbolAccessor,
         ITypeSymbol type,
@@ -101,7 +105,7 @@ public static class CollectionInfoBuilder
             type,
             typeInfo,
             implementedTypes,
-            enumeratedType,
+            symbolAccessor.UpgradeNullable(enumeratedType),
             FindCountProperty(symbolAccessor, type, typeInfo),
             HasValidAddMethod(wellKnownTypes, type, typeInfo, implementedTypes),
             collectionTypeInfo?.Immutable == true
@@ -112,8 +116,8 @@ public static class CollectionInfoBuilder
     {
         // if type is array return element type
         // otherwise using the IEnumerable element type can erase the null annotation for external types
-        if (type.IsArrayType())
-            return ((IArrayTypeSymbol)type).ElementType;
+        if (type.IsArrayType(out var arraySymbol))
+            return arraySymbol.ElementType;
 
         if (type.ImplementsGeneric(types.Get(typeof(IEnumerable<>)), out var enumerableIntf))
             return enumerableIntf.TypeArguments[0];
@@ -133,6 +137,7 @@ public static class CollectionInfoBuilder
         {
             return namedType.TypeArguments[0];
         }
+
         // Memory<> or ReadOnlyMemory<> etc, get the type symbol
         if (
             SymbolEqualityComparer.Default.Equals(type.OriginalDefinition, types.Get(typeof(Memory<>)))
@@ -202,8 +207,8 @@ public static class CollectionInfoBuilder
 
         var member = symbolAccessor
             .GetAllAccessibleMappableMembers(t)
-            .FirstOrDefault(
-                x => x.Type.SpecialType == SpecialType.System_Int32 && x.Name is nameof(ICollection<object>.Count) or nameof(Array.Length)
+            .FirstOrDefault(x =>
+                x.Type.SpecialType == SpecialType.System_Int32 && x.Name is nameof(ICollection<object>.Count) or nameof(Array.Length)
             );
         return member?.Name;
     }
@@ -370,7 +375,7 @@ public static class CollectionInfoBuilder
                 if (typeInfo.GetTypeSymbol(types) is not { } typeSymbol)
                     continue;
 
-                if (type.ImplementsGeneric(typeSymbol, out _))
+                if (type.ExtendsOrImplementsGeneric(typeSymbol, out _))
                 {
                     implementedCollectionTypes |= typeInfo.CollectionType;
                 }
@@ -379,4 +384,8 @@ public static class CollectionInfoBuilder
             return implementedCollectionTypes;
         }
     }
+
+    public static Type GetGenericClrCollectionType(CollectionType type) =>
+        _collectionClrTypeByType.GetValueOrDefault(type)
+        ?? throw new InvalidOperationException("Could not get clr collection type for " + type);
 }

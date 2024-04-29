@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using Riok.Mapperly.Abstractions.ReferenceHandling;
 
 namespace Riok.Mapperly.Abstractions;
@@ -6,6 +7,7 @@ namespace Riok.Mapperly.Abstractions;
 /// Marks a partial class as a mapper.
 /// </summary>
 [AttributeUsage(AttributeTargets.Class)]
+[Conditional("MAPPERLY_ABSTRACTIONS_SCOPE_RUNTIME")]
 public class MapperAttribute : Attribute
 {
     /// <summary>
@@ -86,6 +88,38 @@ public class MapperAttribute : Attribute
     /// Defaults to <see cref="IgnoreObsoleteMembersStrategy.None"/>.
     /// </summary>
     public IgnoreObsoleteMembersStrategy IgnoreObsoleteMembersStrategy { get; set; } = IgnoreObsoleteMembersStrategy.None;
+
+    /// <summary>
+    /// Defines the strategy used when emitting warnings for unmapped members.
+    /// By default this is <see cref="RequiredMappingStrategy.Both"/>, emitting warnings for unmapped source and target members.
+    /// </summary>
+    public RequiredMappingStrategy RequiredMappingStrategy { get; set; } = RequiredMappingStrategy.Both;
+
+    /// <summary>
+    /// Determines the access level of members that Mapperly will map.
+    /// </summary>
+    public MemberVisibility IncludedMembers { get; set; } = MemberVisibility.AllAccessible;
+
+    /// <summary>
+    /// Controls the priority of constructors used in mapping.
+    /// When <c>true</c>, a parameterless constructor is prioritized over constructors with parameters.
+    /// When <c>false</c>, accessible constructors are ordered in descending order by their parameter count.
+    /// </summary>
+    public bool PreferParameterlessConstructors { get; set; } = true;
+
+    /// <summary>
+    /// Whether to automatically discover user mapping methods based on their signature.
+    /// Partial methods are always considered mapping methods.
+    /// If <c>true</c>, all partial methods and methods with an implementation body and a mapping method signature are discovered as mapping methods.
+    /// If <c>false</c> only partial methods and methods with a <see cref="UserMappingAttribute"/> are discovered.
+    ///
+    /// To discover mappings in external mappers (<seealso cref="UseMapperAttribute"/> and <seealso cref="UseStaticMapperAttribute"/>)
+    /// the same rules are applied:
+    /// If set to <c>true</c> all methods with a mapping method signature are automatically discovered.
+    /// If set to <c>false</c> methods with a <see cref="UserMappingAttribute"/> and if the containing class has a <see cref="MapperAttribute"/>
+    /// partial methods are discovered.
+    /// </summary>
+    public bool AutoUserMappings { get; set; } = true;
 
     /// <summary>
     /// Whether to map only primitive types.

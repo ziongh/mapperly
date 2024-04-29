@@ -3,7 +3,6 @@ using Riok.Mapperly.Diagnostics;
 
 namespace Riok.Mapperly.Tests.Mapping;
 
-[UsesVerify]
 public class ObjectPropertyTest
 {
     [Fact]
@@ -201,8 +200,8 @@ public class ObjectPropertyTest
         var source = TestSourceBuilder.MapperWithBodyAndTypes(
             "private partial B Map(A source);",
             new TestSourceBuilderOptions { PropertyNameMappingStrategy = PropertyNameMappingStrategy.CaseSensitive },
-            "class A { public string StringValue { get; set; } }",
-            "class B { public string stringvalue { get; set; } }"
+            "class A { public string StringValue { get; set; } public int IntValue { get; set; } }",
+            "class B { public string stringvalue { get; set; } public int IntValue { get; set; } }"
         );
 
         return TestHelper.VerifyGenerator(source);
@@ -235,19 +234,20 @@ public class ObjectPropertyTest
     [Fact]
     public void ShouldUseUserImplementedMapping()
     {
-        var mapperBody = """
+        var source = TestSourceBuilder.MapperWithBodyAndTypes(
+            """
             public partial B Map(A source);
+
+            [UserMapping(Default = true)]
             private D UserImplementedMap(C source)
             {
                 var target = Map(source);
                 target.StringValue += "ok";
                 return target;
             }
-            private partial D MapToD(C source);
-            """;
 
-        var source = TestSourceBuilder.MapperWithBodyAndTypes(
-            mapperBody,
+            private partial D MapToD(C source);
+            """,
             "class A { public string StringValue { get; set; } public C NestedValue { get; set; } }",
             "class B { public string StringValue { get; set; } public D NestedValue { get; set; } }",
             "class C { public string StringValue { get; set; } }",
@@ -438,7 +438,7 @@ public class ObjectPropertyTest
         );
 
         TestHelper
-            .GenerateMapper(source, TestHelperOptions.AllowAllDiagnostics)
+            .GenerateMapper(source, TestHelperOptions.AllowDiagnostics)
             .Should()
             .HaveDiagnostic(DiagnosticDescriptors.CouldNotCreateMapping)
             .HaveAssertedAllDiagnostics();
@@ -458,7 +458,7 @@ public class ObjectPropertyTest
         );
 
         TestHelper
-            .GenerateMapper(source, TestHelperOptions.AllowAllDiagnostics)
+            .GenerateMapper(source, TestHelperOptions.AllowDiagnostics)
             .Should()
             .HaveDiagnostic(DiagnosticDescriptors.SourceMemberNotMapped)
             .HaveDiagnostic(
@@ -497,5 +497,26 @@ public class ObjectPropertyTest
                 return target;
                 """
             );
+    }
+
+    [Fact]
+    public void InvalidMapPropertyAttributeUsageShouldDiagnostic()
+    {
+        var source = TestSourceBuilder.MapperWithBodyAndTypes(
+            """
+            [MapProperty("IntValue", "StringValue", StringFormat = "D", Use = nameof(IntToString))]
+            partial B Map(A src);
+
+            string IntToString(int x) => x.ToString();
+            """,
+            "class A { public int IntValue { get; set; } }",
+            "class B { public string StringValue { get; set; } }"
+        );
+
+        TestHelper
+            .GenerateMapper(source, TestHelperOptions.AllowDiagnostics)
+            .Should()
+            .HaveDiagnostic(DiagnosticDescriptors.InvalidMapPropertyAttributeUsage, "Invalid usage of the MapPropertyAttribute")
+            .HaveAssertedAllDiagnostics();
     }
 }
