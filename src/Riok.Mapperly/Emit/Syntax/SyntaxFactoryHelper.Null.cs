@@ -43,7 +43,10 @@ public partial struct SyntaxFactoryHelper
                         $"Sequence {NameOf(memberAccess.Expression)}, contained a null value at index {memberAccess.ArgumentList.Arguments[0].Expression}."
                     )
                 ),
-            _ => ThrowArgumentNullException(argument),
+            _ when argument is MemberAccessExpressionSyntax or SimpleNameSyntax => ThrowArgumentNullException(argument),
+            _ when argument is InvocationExpressionSyntax invocation
+                => ThrowNullReferenceException(StringLiteral(invocation.Expression + " returned null")),
+            _ => ThrowNullReferenceException(StringLiteral(argument + " is null")),
         };
     }
 
@@ -57,4 +60,7 @@ public partial struct SyntaxFactoryHelper
 
         return If(IsNull(expression), ifExpression);
     }
+
+    public static ExpressionSyntax SuppressNullableWarning(ExpressionSyntax expression) =>
+        PostfixUnaryExpression(SyntaxKind.SuppressNullableWarningExpression, expression);
 }

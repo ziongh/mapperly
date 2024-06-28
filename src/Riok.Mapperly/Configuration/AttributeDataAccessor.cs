@@ -1,3 +1,4 @@
+using System.Reflection;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Riok.Mapperly.Descriptors;
@@ -66,7 +67,7 @@ public class AttributeDataAccessor(SymbolAccessor symbolAccessor)
         var syntaxArguments =
             (IReadOnlyList<AttributeArgumentSyntax>?)syntax?.ArgumentList?.Arguments
             ?? new AttributeArgumentSyntax[attrData.ConstructorArguments.Length + attrData.NamedArguments.Length];
-        var typeArguments = (IReadOnlyCollection<ITypeSymbol>?)attrData.AttributeClass?.TypeArguments ?? Array.Empty<ITypeSymbol>();
+        var typeArguments = (IReadOnlyCollection<ITypeSymbol>?)attrData.AttributeClass?.TypeArguments ?? [];
         var attr = Create<TData>(typeArguments, attrData.ConstructorArguments, syntaxArguments);
 
         var syntaxIndex = attrData.ConstructorArguments.Length;
@@ -112,17 +113,24 @@ public class AttributeDataAccessor(SymbolAccessor symbolAccessor)
                 (arg, i) => BuildArgumentValue(arg, parameters[i + typeArguments.Count].ParameterType, argumentSyntax[i])
             );
             var constructorTypeAndValueArguments = typeArguments.Concat(constructorArgumentValues).ToArray();
+            if (!ValidateParameterTypes(constructorTypeAndValueArguments, parameters))
+                continue;
+
             return (TData?)Activator.CreateInstance(typeof(TData), constructorTypeAndValueArguments)
                 ?? throw new InvalidOperationException($"Could not create instance of {typeof(TData)}");
         }
 
-        throw new InvalidOperationException($"{typeof(TData)} does not have a constructor with {argCount} parameters");
+        throw new InvalidOperationException(
+            $"{typeof(TData)} does not have a constructor with {argCount} parameters and matchable arguments"
+        );
     }
 
     private static object? BuildArgumentValue(TypedConstant arg, Type targetType, AttributeArgumentSyntax? syntax)
     {
         return arg.Kind switch
         {
+            _ when (targetType == typeof(AttributeValue?) || targetType == typeof(AttributeValue)) && syntax != null
+                => new AttributeValue(arg, syntax.Expression),
             _ when arg.IsNull => null,
             _ when targetType == typeof(StringMemberPath) => CreateMemberPath(arg, syntax),
             TypedConstantKind.Enum => GetEnumValue(arg, targetType),
@@ -140,7 +148,10 @@ public class AttributeDataAccessor(SymbolAccessor symbolAccessor)
     {
         if (arg.Kind == TypedConstantKind.Array)
         {
-            var values = arg.Values.Select(x => (string?)BuildArgumentValue(x, typeof(string), null)).WhereNotNull().ToList();
+            var values = arg
+                .Values.Select(x => (string?)BuildArgumentValue(x, typeof(string), null))
+                .WhereNotNull()
+                .ToImmutableEquatableArray();
             return new StringMemberPath(values);
         }
 
@@ -163,14 +174,14 @@ public class AttributeDataAccessor(SymbolAccessor symbolAccessor)
                     .TrimStart(FullNameOfPrefix)
                     .Split(StringMemberPath.MemberAccessSeparator)
                     .Skip(1)
-                    .ToArray();
+                    .ToImmutableEquatableArray();
                 return new StringMemberPath(argMemberPath);
             }
         }
 
         if (arg is { Kind: TypedConstantKind.Primitive, Value: string v })
         {
-            return new StringMemberPath(v.Split(StringMemberPath.MemberAccessSeparator));
+            return new StringMemberPath(v.Split(StringMemberPath.MemberAccessSeparator).ToImmutableEquatableArray());
         }
 
         throw new InvalidOperationException($"Cannot create {nameof(StringMemberPath)} from {arg.Kind}");
@@ -200,5 +211,24 @@ public class AttributeDataAccessor(SymbolAccessor symbolAccessor)
         }
 
         return Enum.ToObject(targetType, arg.Value);
+    }
+
+    private static bool ValidateParameterTypes(object?[] arguments, ParameterInfo[] parameters)
+    {
+        if (arguments.Length != parameters.Length)
+            return false;
+
+        for (var argIdx = 0; argIdx < arguments.Length; argIdx++)
+        {
+            var value = arguments[argIdx];
+            var param = parameters[argIdx];
+            if (value == null && param.ParameterType.IsValueType)
+                return false;
+
+            if (value?.GetType().IsAssignableTo(param.ParameterType) == false)
+                return false;
+        }
+
+        return true;
     }
 }

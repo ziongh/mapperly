@@ -27,6 +27,50 @@ public class ObjectPropertyFlatteningTest
     }
 
     [Fact]
+    public void ManualFlattenedPropertyWithSourceArray()
+    {
+        var source = TestSourceBuilder.MapperWithBodyAndTypes(
+            "[MapProperty(new string[]{nameof(C.Value), nameof(C.Value.Id)}, nameof(B.MyValueId))] partial B Map(A source);",
+            "class A { public C Value { get; set; } }",
+            "class B { public string MyValueId { get; set; } }",
+            "class C { public string Id { get; set; }"
+        );
+
+        TestHelper
+            .GenerateMapper(source)
+            .Should()
+            .HaveSingleMethodBody(
+                """
+                var target = new global::B();
+                target.MyValueId = source.Value.Id;
+                return target;
+                """
+            );
+    }
+
+    [Fact]
+    public void ManualFlattenedPropertyWithSourceAndTargetArray()
+    {
+        var source = TestSourceBuilder.MapperWithBodyAndTypes(
+            "[MapProperty(new string[]{nameof(C.Value), nameof(C.Value.Id)}, new string[] {nameof(B.MyValueId)})] partial B Map(A source);",
+            "class A { public C Value { get; set; } }",
+            "class B { public string MyValueId { get; set; } }",
+            "class C { public string Id { get; set; }"
+        );
+
+        TestHelper
+            .GenerateMapper(source)
+            .Should()
+            .HaveSingleMethodBody(
+                """
+                var target = new global::B();
+                target.MyValueId = source.Value.Id;
+                return target;
+                """
+            );
+    }
+
+    [Fact]
     public void ManualFlattenedPropertyWithInterpolatedNameOfSource()
     {
         var source = TestSourceBuilder.MapperWithBodyAndTypes(
@@ -105,8 +149,13 @@ public class ObjectPropertyFlatteningTest
         );
 
         TestHelper
-            .GenerateMapper(source, TestHelperOptions.AllowInfoDiagnostics)
+            .GenerateMapper(source, TestHelperOptions.AllowDiagnostics)
             .Should()
+            .HaveDiagnostic(
+                DiagnosticDescriptors.SourceMemberNotMapped,
+                "The member Value on the mapping source type A is not mapped to any member on the mapping target type B"
+            )
+            .HaveAssertedAllDiagnostics()
             .HaveSingleMethodBody(
                 """
                 var target = new global::B();
@@ -343,6 +392,28 @@ public class ObjectPropertyFlatteningTest
     }
 
     [Fact]
+    public void ManualUnflattenedPropertyWithTargetArray()
+    {
+        var source = TestSourceBuilder.MapperWithBodyAndTypes(
+            "[MapProperty(nameof(C.MyValueId), new string[] { nameof(B.Value), nameof(B.Value.Id) })] partial B Map(A source);",
+            "class A { public string MyValueId { get; set; }  }",
+            "class B { public C Value { get; set; } }",
+            "class C { public string Id { get; set; }"
+        );
+
+        TestHelper
+            .GenerateMapper(source)
+            .Should()
+            .HaveSingleMethodBody(
+                """
+                var target = new global::B();
+                target.Value.Id = source.MyValueId;
+                return target;
+                """
+            );
+    }
+
+    [Fact]
     public void ManualUnflattenedPropertyInterpolatedFullNameOfTarget()
     {
         var source = TestSourceBuilder.MapperWithBodyAndTypes(
@@ -453,7 +524,7 @@ public class ObjectPropertyFlatteningTest
     public Task ManualUnflattenedPropertySourcePropertyNotFoundShouldDiagnostic()
     {
         var source = TestSourceBuilder.MapperWithBodyAndTypes(
-            "[MapProperty($\"MyValueIdXXX\", \"Value.Id\")] private partial B Map(A source);",
+            "[MapProperty(\"MyValueIdXXX\", \"Value.Id\")] private partial B Map(A source);",
             "class A { public string MyValueId { get; set; } }",
             "class B { public C? Value { get; set; } }",
             "class C { public C(string arg) {} public string Id { get; set; } }"
@@ -479,7 +550,7 @@ public class ObjectPropertyFlatteningTest
     public Task ManualUnflattenedPropertyTargetPropertyNotFoundShouldDiagnostic()
     {
         var source = TestSourceBuilder.MapperWithBodyAndTypes(
-            "[MapProperty($\"MyValueId\", \"Value.IdXXX\")] private partial B Map(A source);",
+            "[MapProperty(\"MyValueId\", \"Value.IdXXX\")] private partial B Map(A source);",
             "class A { public string MyValueId { get; set; } }",
             "class B { public C? Value { get; set; } }",
             "class C { public C(string arg) {} public string Id { get; set; } }"

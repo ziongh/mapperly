@@ -165,3 +165,30 @@ Rule ID | Category | Severity | Notes
 RMG071  | Mapper   | Warning  | Nested properties mapping is not used
 RMG072  | Mapper   | Warning  | The source type of the referenced mapping does not match
 RMG073  | Mapper   | Warning  | The target type of the referenced mapping does not match
+
+## Release 4.0
+
+### New Rules
+
+Rule ID | Category | Severity | Notes
+--------|----------|----------|-------
+RMG074  | Mapper   | Error    | Multiple mappings are configured for the same target member
+RMG075  | Mapper   | Error    | Invalid usage of the MapValueAttribute
+RMG076  | Mapper   | Warning  | Cannot assign null to non-nullable member
+RMG077  | Mapper   | Error    | Cannot assign constant value because the type of the value does not match the type of the target
+RMG078  | Mapper   | Error    | Cannot assign method return type because the type of the value does not match the type of the target
+RMG079  | Mapper   | Error    | The referenced method could not be found or has an unsupported signature
+RMG080  | Mapper   | Error    | The MapValueAttribute does not support types and arrays
+RMG012  | Mapper   | Warning  | Source member was not found for target member
+RMG020  | Mapper   | Warning  | Source member is not mapped to any target member
+RMG037  | Mapper   | Warning  | An enum member could not be found on the source enum
+RMG038  | Mapper   | Warning  | An enum member could not be found on the target enum
+
+### Removed Rules
+
+Rule ID | Category | Severity | Notes
+--------|----------|----------|-------
+RMG017  | Mapper   | Warning  | An init only member can have one configuration at max
+RMG026  | Mapper   | Info     | Cannot map from indexed member
+RMG027  | Mapper   | Warning  | A constructor parameter can have one configuration at max
+RMG028  | Mapper   | Warning  | Constructor parameter cannot handle target paths

@@ -6,14 +6,14 @@
       Severity: Info,
       WarningLevel: 1,
       Location: : (11,4)-(11,36),
-      MessageFormat: Cannot map member {0}.{1} of type {2} to read only member {3}.{4} of type {5},
-      Message: Cannot map member A.StringValue of type string to read only member B.StringValue of type string,
+      MessageFormat: Cannot map {0} to read only member {1},
+      Message: Cannot map A.StringValue to read only member B.StringValue,
       Category: Mapper
     },
     {
       Id: RMG020,
       Title: Source member is not mapped to any target member,
-      Severity: Info,
+      Severity: Warning,
       WarningLevel: 1,
       Location: : (11,4)-(11,36),
       MessageFormat: The member {0} on the mapping source type {1} is not mapped to any member on the mapping target type {2},

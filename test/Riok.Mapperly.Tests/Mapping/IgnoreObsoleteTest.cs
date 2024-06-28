@@ -88,16 +88,20 @@ public class IgnoreObsoleteTest
         );
 
         TestHelper
-            .GenerateMapper(source, TestHelperOptions.AllowInfoDiagnostics)
+            .GenerateMapper(source, TestHelperOptions.AllowDiagnostics)
             .Should()
+            .HaveDiagnostic(
+                DiagnosticDescriptors.SourceMemberNotFound,
+                "The member Ignored on the mapping target type B was not found on the mapping source type A"
+            )
+            .HaveAssertedAllDiagnostics()
             .HaveSingleMethodBody(
                 """
                 var target = new global::B();
                 target.Value = source.Value;
                 return target;
                 """
-            )
-            .HaveDiagnostic(DiagnosticDescriptors.SourceMemberNotFound);
+            );
     }
 
     [Fact]
@@ -112,16 +116,20 @@ public class IgnoreObsoleteTest
         );
 
         TestHelper
-            .GenerateMapper(source, TestHelperOptions.AllowInfoDiagnostics)
+            .GenerateMapper(source, TestHelperOptions.AllowDiagnostics)
             .Should()
+            .HaveDiagnostic(
+                DiagnosticDescriptors.SourceMemberNotMapped,
+                "The member Ignored on the mapping source type A is not mapped to any member on the mapping target type B"
+            )
+            .HaveAssertedAllDiagnostics()
             .HaveSingleMethodBody(
                 """
                 var target = new global::B();
                 target.Value = source.Value;
                 return target;
                 """
-            )
-            .HaveDiagnostic(DiagnosticDescriptors.SourceMemberNotMapped);
+            );
     }
 
     [Fact]
@@ -173,16 +181,20 @@ public class IgnoreObsoleteTest
         );
 
         TestHelper
-            .GenerateMapper(source, TestHelperOptions.AllowInfoDiagnostics)
+            .GenerateMapper(source, TestHelperOptions.AllowDiagnostics)
             .Should()
+            .HaveDiagnostic(
+                DiagnosticDescriptors.SourceMemberNotFound,
+                "The member Ignored on the mapping target type B was not found on the mapping source type A"
+            )
+            .HaveAssertedAllDiagnostics()
             .HaveSingleMethodBody(
                 """
                 var target = new global::B();
                 target.Value = source.Value;
                 return target;
                 """
-            )
-            .HaveDiagnostic(DiagnosticDescriptors.SourceMemberNotFound);
+            );
     }
 
     [Fact]
@@ -195,16 +207,20 @@ public class IgnoreObsoleteTest
         );
 
         TestHelper
-            .GenerateMapper(source, TestHelperOptions.AllowInfoDiagnostics)
+            .GenerateMapper(source, TestHelperOptions.AllowDiagnostics)
             .Should()
+            .HaveDiagnostic(
+                DiagnosticDescriptors.SourceMemberNotMapped,
+                "The member Ignored on the mapping source type A is not mapped to any member on the mapping target type B"
+            )
+            .HaveAssertedAllDiagnostics()
             .HaveSingleMethodBody(
                 """
                 var target = new global::B();
                 target.Value = source.Value;
                 return target;
                 """
-            )
-            .HaveDiagnostic(DiagnosticDescriptors.SourceMemberNotMapped);
+            );
     }
 
     [Fact]
@@ -256,11 +272,11 @@ public class IgnoreObsoleteTest
             )
             .HaveDiagnostic(
                 DiagnosticDescriptors.IgnoredSourceMemberExplicitlyMapped,
-                "The source member Ignored on A is ignored, but is also mapped by the MapPropertyAttribute"
+                "The source member Ignored on A is ignored, but is also mapped explicitly"
             )
             .HaveDiagnostic(
                 DiagnosticDescriptors.IgnoredTargetMemberExplicitlyMapped,
-                "The target member Ignored on B is ignored, but is also mapped by the MapPropertyAttribute"
+                "The target member Ignored on B is ignored, but is also mapped explicitly"
             )
             .HaveAssertedAllDiagnostics();
     }
@@ -291,7 +307,7 @@ public class IgnoreObsoleteTest
             )
             .HaveDiagnostic(
                 DiagnosticDescriptors.IgnoredSourceMemberExplicitlyMapped,
-                "The source member Ignored on A is ignored, but is also mapped by the MapPropertyAttribute"
+                "The source member Ignored on A is ignored, but is also mapped explicitly"
             )
             .HaveAssertedAllDiagnostics();
     }
@@ -322,7 +338,7 @@ public class IgnoreObsoleteTest
             )
             .HaveDiagnostic(
                 DiagnosticDescriptors.IgnoredTargetMemberExplicitlyMapped,
-                "The target member Ignored on B is ignored, but is also mapped by the MapPropertyAttribute"
+                "The target member Ignored on B is ignored, but is also mapped explicitly"
             )
             .HaveAssertedAllDiagnostics();
     }
@@ -363,7 +379,7 @@ public class IgnoreObsoleteTest
             )
             .HaveDiagnostic(
                 DiagnosticDescriptors.IgnoredTargetMemberExplicitlyMapped,
-                "The target member Ignored on B is ignored, but is also mapped by the MapPropertyAttribute"
+                "The target member Ignored on B is ignored, but is also mapped explicitly"
             )
             .HaveAssertedAllDiagnostics();
     }
@@ -404,7 +420,7 @@ public class IgnoreObsoleteTest
             )
             .HaveDiagnostic(
                 DiagnosticDescriptors.IgnoredTargetMemberExplicitlyMapped,
-                "The target member Ignored on B is ignored, but is also mapped by the MapPropertyAttribute"
+                "The target member Ignored on B is ignored, but is also mapped explicitly"
             )
             .HaveAssertedAllDiagnostics();
     }

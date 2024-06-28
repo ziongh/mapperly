@@ -29,20 +29,13 @@ public class MapperConfigurationReader
                 mapper.EnumMappingStrategy,
                 mapper.EnumMappingIgnoreCase,
                 null,
-                Array.Empty<IFieldSymbol>(),
-                Array.Empty<IFieldSymbol>(),
-                Array.Empty<EnumValueMappingConfiguration>(),
+                [],
+                [],
+                [],
                 mapper.RequiredMappingStrategy
             ),
-            new MembersMappingConfiguration(
-                Array.Empty<string>(),
-                Array.Empty<string>(),
-                Array.Empty<MemberMappingConfiguration>(),
-                Array.Empty<NestedMembersMappingConfiguration>(),
-                mapper.IgnoreObsoleteMembersStrategy,
-                mapper.RequiredMappingStrategy
-            ),
-            Array.Empty<DerivedTypeMappingConfiguration>()
+            new MembersMappingConfiguration([], [], [], [], [], mapper.IgnoreObsoleteMembersStrategy, mapper.RequiredMappingStrategy),
+            []
         );
     }
 
@@ -82,7 +75,11 @@ public class MapperConfigurationReader
             .Select(x => x.Target)
             .WhereNotNull()
             .ToList();
-        var memberConfigurations = _dataAccessor.Access<MapPropertyAttribute, MemberMappingConfiguration>(configRef.Method).ToList();
+        var memberValueConfigurations = _dataAccessor.Access<MapValueAttribute, MemberValueMappingConfiguration>(configRef.Method).ToList();
+        var memberConfigurations = _dataAccessor
+            .Access<MapPropertyAttribute, MemberMappingConfiguration>(configRef.Method)
+            .Concat(_dataAccessor.Access<MapPropertyFromSourceAttribute, MemberMappingConfiguration>(configRef.Method))
+            .ToList();
         var nestedMembersConfigurations = _dataAccessor
             .Access<MapNestedPropertiesAttribute, NestedMembersMappingConfiguration>(configRef.Method)
             .ToList();
@@ -110,14 +107,20 @@ public class MapperConfigurationReader
             return MapperConfiguration.Members;
         }
 
-        foreach (var invalidMemberConfigs in memberConfigurations.Where(x => !x.IsValid))
+        foreach (var invalidMemberConfig in memberValueConfigurations.Where(x => !x.IsValid))
         {
-            diagnostics.ReportDiagnostic(DiagnosticDescriptors.InvalidMapPropertyAttributeUsage, invalidMemberConfigs.Location);
+            diagnostics.ReportDiagnostic(DiagnosticDescriptors.InvalidMapValueAttributeUsage, invalidMemberConfig.Location);
+        }
+
+        foreach (var invalidMemberConfig in memberConfigurations.Where(x => !x.IsValid))
+        {
+            diagnostics.ReportDiagnostic(DiagnosticDescriptors.InvalidMapPropertyAttributeUsage, invalidMemberConfig.Location);
         }
 
         return new MembersMappingConfiguration(
             ignoredSourceMembers,
             ignoredTargetMembers,
+            memberValueConfigurations,
             memberConfigurations,
             nestedMembersConfigurations,
             ignoreObsolete ?? MapperConfiguration.Members.IgnoreObsoleteMembersStrategy,

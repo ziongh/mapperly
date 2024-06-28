@@ -69,13 +69,14 @@ namespace Riok.Mapperly.IntegrationTests.Mapper
         )]
         [MapProperty(nameof(TestObject.RenamedStringValue), nameof(TestObjectDto.RenamedStringValue2))]
         [MapProperty(
-            new[] { nameof(TestObject.UnflatteningIdValue) },
+            nameof(TestObject.UnflatteningIdValue),
             new[] { nameof(TestObjectDto.Unflattening), nameof(TestObjectDto.Unflattening.IdValue) }
         )]
         [MapProperty(
             nameof(TestObject.NullableUnflatteningIdValue),
             nameof(TestObjectDto.NullableUnflattening) + "." + nameof(TestObjectDto.NullableUnflattening.IdValue)
         )]
+        [MapPropertyFromSource(nameof(TestObjectDto.Sum), Use = nameof(ComputeSum))]
         [MapNestedProperties(nameof(TestObject.NestedMember))]
         [MapperIgnoreObsoleteMembers]
         private partial TestObjectDto MapToDtoInternal(TestObject testObject);
@@ -96,6 +97,9 @@ namespace Riok.Mapperly.IntegrationTests.Mapper
         public partial TestEnumDtoByName MapToEnumDtoByName(TestEnum v);
 
         private partial int PrivateDirectInt(int value);
+
+        [UserMapping(Default = false)]
+        private int ComputeSum(TestObject testObject) => testObject.SumComponent1 + testObject.SumComponent2;
 
 #if NET8_0_OR_GREATER
         public partial AliasedTupleTarget MapAliasedTuple(AliasedTupleSource source);

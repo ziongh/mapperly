@@ -16,7 +16,7 @@ public static class TestHelper
         var driver = Generate(source, options);
         var verify = Verify(driver);
 
-        if (args.Any())
+        if (args.Length != 0)
         {
             verify.UseParameters(args);
         }
@@ -43,7 +43,7 @@ public static class TestHelper
         var filteredDiagnostics = result.Diagnostics.Where(x => !ignoredDiagnosticDescriptorIds.Contains(x.Descriptor.Id)).ToList();
         var groupedDiagnostics = filteredDiagnostics
             .GroupBy(x => x.Descriptor.Id)
-            .ToDictionary(x => x.Key, x => (IReadOnlyCollection<Diagnostic>)x.ToList());
+            .ToDictionary(x => x.Key, x => (IReadOnlyList<Diagnostic>)x.ToList());
 
         var mapperResult = new MapperGenerationResult(filteredDiagnostics, groupedDiagnostics, methods);
         if (options.AllowedDiagnosticSeverities != null)

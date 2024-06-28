@@ -120,7 +120,7 @@ public class ObjectPropertyTest
     }
 
     [Fact]
-    public void ShouldIgnoreIndexedPropertyOnSourceWithDiagnostic()
+    public void ShouldIgnoreIndexedProperty()
     {
         var source = TestSourceBuilder.Mapping(
             "A",
@@ -130,9 +130,16 @@ public class ObjectPropertyTest
         );
 
         TestHelper
-            .GenerateMapper(source, TestHelperOptions.AllowDiagnostics)
+            .GenerateMapper(source, TestHelperOptions.AllowAndIncludeAllDiagnostics)
             .Should()
-            .HaveDiagnostic(DiagnosticDescriptors.CannotMapFromIndexedMember, "Cannot map from indexed member A.this[] to member B.this[]");
+            .HaveDiagnostic(DiagnosticDescriptors.NoMemberMappings, "No members are mapped in the object mapping from A to B")
+            .HaveAssertedAllDiagnostics()
+            .HaveMapMethodBody(
+                """
+                var target = new global::B();
+                return target;
+                """
+            );
     }
 
     [Fact]
@@ -160,6 +167,36 @@ public class ObjectPropertyTest
         TestHelper
             .GenerateMapper(source)
             .Should()
+            .HaveSingleMethodBody(
+                """
+                var target = new global::B();
+                target.StringValue2 = source.StringValue;
+                return target;
+                """
+            );
+    }
+
+    [Fact]
+    public void WithManualMappedPropertyDuplicated()
+    {
+        var source = TestSourceBuilder.MapperWithBodyAndTypes(
+            """
+            [MapProperty(nameof(A.StringValue), nameof(B.StringValue2)]
+            [MapProperty(nameof(A.StringValue), nameof(B.StringValue2)]
+            partial B Map(A source);
+            """,
+            "class A { public string StringValue { get; set; } }",
+            "class B { public string StringValue2 { get; set; } }"
+        );
+
+        TestHelper
+            .GenerateMapper(source, TestHelperOptions.AllowDiagnostics)
+            .Should()
+            .HaveDiagnostic(
+                DiagnosticDescriptors.MultipleConfigurationsForTargetMember,
+                "Multiple mappings are configured for the same target member B.StringValue2"
+            )
+            .HaveAssertedAllDiagnostics()
             .HaveSingleMethodBody(
                 """
                 var target = new global::B();
@@ -273,8 +310,8 @@ public class ObjectPropertyTest
         var source = TestSourceBuilder.Mapping(
             "A",
             "B",
-            "class A { public DateTime Value { get; set; } }",
-            "class B { public Version Value { get; set; } }"
+            "class A { public Version Value { get; set; } }",
+            "class B { public DateTime Value { get; set; } }"
         );
 
         return TestHelper.VerifyGenerator(source);
@@ -406,6 +443,35 @@ public class ObjectPropertyTest
     }
 
     [Fact]
+    public Task PropertiesWithCaseInsensitiveEqualNamesShouldWork()
+    {
+        var source = TestSourceBuilder.Mapping(
+            "A",
+            "B",
+            "class A { public int Value { get; set; } }",
+            "class B { public int value { get; set; } public int Value { get; set; } }"
+        );
+
+        return TestHelper.VerifyGenerator(source);
+    }
+
+    [Fact]
+    public Task PropertyConfigurationShouldPreferExactCasing()
+    {
+        var source = TestSourceBuilder.MapperWithBodyAndTypes(
+            """
+            [MapProperty("Value", "value")]
+            [MapProperty("value", "Value")]
+            public partial B Map(A source);
+            """,
+            "class A { public int value { get; set; } public int Value { get; set; } }",
+            "class B { public int value { get; set; } public int Value { get; set; } }"
+        );
+
+        return TestHelper.VerifyGenerator(source);
+    }
+
+    [Fact]
     public void ShouldIgnoreStaticProperty()
     {
         var source = TestSourceBuilder.Mapping(
@@ -460,10 +526,25 @@ public class ObjectPropertyTest
         TestHelper
             .GenerateMapper(source, TestHelperOptions.AllowDiagnostics)
             .Should()
-            .HaveDiagnostic(DiagnosticDescriptors.SourceMemberNotMapped)
+            .HaveDiagnostic(
+                DiagnosticDescriptors.SourceMemberNotMapped,
+                "The member StringValue on the mapping source type A is not mapped to any member on the mapping target type B"
+            )
+            .HaveDiagnostic(
+                DiagnosticDescriptors.SourceMemberNotFound,
+                "The member NestedValue on the mapping target type B was not found on the mapping source type A"
+            )
+            .HaveDiagnostic(
+                DiagnosticDescriptors.SourceMemberNotMapped,
+                "The member StringValue on the mapping source type A is not mapped to any member on the mapping target type B"
+            )
+            .HaveDiagnostic(
+                DiagnosticDescriptors.SourceMemberNotFound,
+                "The member NestedValue on the mapping target type B was not found on the mapping source type A"
+            )
             .HaveDiagnostic(
                 DiagnosticDescriptors.CannotMapToTemporarySourceMember,
-                "Cannot map from member A.StringValue of type string to member path B.NestedValue.StringValue of type string because NestedValue.C is a value type, returning a temporary value, see CS1612"
+                "Cannot map from member A.StringValue to member path B.NestedValue.StringValue of type string because C.NestedValue is a value type, returning a temporary value, see CS1612"
             )
             .HaveAssertedAllDiagnostics()
             .HaveSingleMethodBody(

@@ -19,7 +19,7 @@ public class EnumerableTest
         TestHelper
             .GenerateMapper(source)
             .Should()
-            .HaveSingleMethodBody("return source == null ? throw new System.ArgumentNullException(nameof(source)) : source;");
+            .HaveSingleMethodBody("return source ?? throw new System.ArgumentNullException(nameof(source));");
     }
 
     [Fact]
@@ -34,7 +34,7 @@ public class EnumerableTest
                 var target = new int[source.Length];
                 for (var i = 0; i < source.Length; i++)
                 {
-                    target[i] = source[i] == null ? throw new System.NullReferenceException($"Sequence {nameof(source)}, contained a null value at index {i}.") : source[i].Value;
+                    target[i] = source[i] ?? throw new System.NullReferenceException($"Sequence {nameof(source)}, contained a null value at index {i}.");
                 }
                 return target;
                 """
@@ -79,7 +79,7 @@ public class EnumerableTest
                 var target = new global::B[source.Length];
                 for (var i = 0; i < source.Length; i++)
                 {
-                    target[i] = source[i] == null ? throw new System.NullReferenceException($"Sequence {nameof(source)}, contained a null value at index {i}.") : source[i]!;
+                    target[i] = source[i] ?? throw new System.NullReferenceException($"Sequence {nameof(source)}, contained a null value at index {i}.");
                 }
                 return target;
                 """
@@ -311,45 +311,6 @@ public class EnumerableTest
     }
 
     [Fact]
-    public void EnumerableToCustomCollection()
-    {
-        var source = TestSourceBuilder.Mapping("IEnumerable<long>", "B", "class B : ICollection<int> { public void Add(int item) {} }");
-        TestHelper
-            .GenerateMapper(source)
-            .Should()
-            .HaveSingleMethodBody(
-                """
-                var target = new global::B();
-                foreach (var item in source)
-                {
-                    target.Add((int)item);
-                }
-                return target;
-                """
-            );
-    }
-
-    [Fact]
-    public void EnumerableToExplicitAddCustomCollection()
-    {
-        // should not create a mapping using a looping add method inside a foreach loop when the add method is explicit
-        var source = TestSourceBuilder.Mapping(
-            "IEnumerable<int>",
-            "B",
-            "class B : ICollection<int> { void ICollection<int>.Add(int item) {} }"
-        );
-        TestHelper
-            .GenerateMapper(source)
-            .Should()
-            .HaveSingleMethodBody(
-                """
-                var target = new global::B();
-                return target;
-                """
-            );
-    }
-
-    [Fact]
     public void ReadOnlyCollectionToList()
     {
         var source = TestSourceBuilder.Mapping(
@@ -509,28 +470,6 @@ public class EnumerableTest
                 """
                 var target = new global::B();
                 target.Value = new global::System.Collections.Generic.Queue<long>(global::System.Linq.Enumerable.Select(source.Value, x => (long)x));
-                return target;
-                """
-            );
-    }
-
-    [Fact]
-    public void EnumerableToCustomCollectionWithObjectFactory()
-    {
-        var source = TestSourceBuilder.MapperWithBodyAndTypes(
-            "[ObjectFactory] B CreateB() => new();" + "partial B Map(IEnumerable<long> source);",
-            "class B : ICollection<int> { public void Add(int item) {} }"
-        );
-        TestHelper
-            .GenerateMapper(source)
-            .Should()
-            .HaveSingleMethodBody(
-                """
-                var target = CreateB();
-                foreach (var item in source)
-                {
-                    target.Add((int)item);
-                }
                 return target;
                 """
             );
@@ -710,15 +649,17 @@ public class EnumerableTest
         );
 
         TestHelper
-            .GenerateMapper(source, TestHelperOptions.AllowInfoDiagnostics)
+            .GenerateMapper(source, TestHelperOptions.AllowDiagnostics)
             .Should()
+            .HaveDiagnostic(DiagnosticDescriptors.CannotMapToReadOnlyMember)
+            .HaveDiagnostic(DiagnosticDescriptors.SourceMemberNotMapped)
+            .HaveAssertedAllDiagnostics()
             .HaveSingleMethodBody(
                 """
                 var target = new global::B();
                 return target;
                 """
-            )
-            .HaveDiagnostic(DiagnosticDescriptors.CannotMapToReadOnlyMember);
+            );
     }
 
     [Fact]

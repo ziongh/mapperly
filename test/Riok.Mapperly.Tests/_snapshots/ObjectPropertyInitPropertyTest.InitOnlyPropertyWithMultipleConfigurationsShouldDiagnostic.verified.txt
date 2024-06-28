@@ -1,21 +1,21 @@
 ﻿{
   Diagnostics: [
     {
-      Id: RMG017,
-      Title: An init only member can have one configuration at max,
-      Severity: Warning,
-      WarningLevel: 1,
-      Location: : (11,4)-(11,128),
-      MessageFormat: The init only member {0}.{1} can have one configuration at max,
-      Message: The init only member string.StringValue can have one configuration at max,
+      Id: RMG074,
+      Title: Multiple mappings are configured for the same target member,
+      Severity: Error,
+      WarningLevel: 0,
+      Location: : (11,4)-(11,126),
+      MessageFormat: Multiple mappings are configured for the same target member {0}.{1},
+      Message: Multiple mappings are configured for the same target member B.StringValue,
       Category: Mapper
     },
     {
       Id: RMG020,
       Title: Source member is not mapped to any target member,
-      Severity: Info,
+      Severity: Warning,
       WarningLevel: 1,
-      Location: : (11,4)-(11,128),
+      Location: : (11,4)-(11,126),
       MessageFormat: The member {0} on the mapping source type {1} is not mapped to any member on the mapping target type {2},
       Message: The member StringValue3 on the mapping source type A is not mapped to any member on the mapping target type B,
       Category: Mapper

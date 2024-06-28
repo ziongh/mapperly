@@ -69,7 +69,7 @@ public static class DiagnosticDescriptors
         new(
             "RMG007",
             "Could not map member",
-            "Could not map member {0}.{1} of type {2} to {3}.{4} of type {5}",
+            "Could not map member {0} to {1}",
             DiagnosticCategories.Mapper,
             DiagnosticSeverity.Error,
             true
@@ -89,7 +89,7 @@ public static class DiagnosticDescriptors
         new(
             "RMG009",
             "Cannot map to read only member",
-            "Cannot map member {0}.{1} of type {2} to read only member {3}.{4} of type {5}",
+            "Cannot map {0} to read only member {1}",
             DiagnosticCategories.Mapper,
             DiagnosticSeverity.Info,
             true
@@ -99,7 +99,7 @@ public static class DiagnosticDescriptors
         new(
             "RMG010",
             "Cannot map from write only member",
-            "Cannot map from write only member {0}.{1} of type {2} to member {3}.{4} of type {5}",
+            "Cannot map from write only member {0} to member {1}",
             DiagnosticCategories.Mapper,
             DiagnosticSeverity.Info,
             true
@@ -109,7 +109,7 @@ public static class DiagnosticDescriptors
         new(
             "RMG011",
             "Cannot map to write only member path",
-            "Cannot map from member {0}.{1} of type {2} to write only member path {3}.{4} of type {5}",
+            "Cannot map from {0} to write only member path {1}",
             DiagnosticCategories.Mapper,
             DiagnosticSeverity.Info,
             true
@@ -121,7 +121,7 @@ public static class DiagnosticDescriptors
             "Source member was not found for target member",
             "The member {0} on the mapping target type {1} was not found on the mapping source type {2}",
             DiagnosticCategories.Mapper,
-            DiagnosticSeverity.Info,
+            DiagnosticSeverity.Warning,
             true
         );
 
@@ -149,7 +149,7 @@ public static class DiagnosticDescriptors
         new(
             "RMG015",
             "Cannot map to init only member path",
-            "Cannot map from member {0}.{1} of type {2} to init only member path {3}.{4} of type {5}",
+            "Cannot map from {0} to init only member path {1}",
             DiagnosticCategories.Mapper,
             DiagnosticSeverity.Info,
             true
@@ -165,23 +165,13 @@ public static class DiagnosticDescriptors
             true
         );
 
-    public static readonly DiagnosticDescriptor MultipleConfigurationsForInitOnlyMember =
-        new(
-            "RMG017",
-            "An init only member can have one configuration at max",
-            "The init only member {0}.{1} can have one configuration at max",
-            DiagnosticCategories.Mapper,
-            DiagnosticSeverity.Warning,
-            true
-        );
-
     public static readonly DiagnosticDescriptor SourceMemberNotMapped =
         new(
             "RMG020",
             "Source member is not mapped to any target member",
             "The member {0} on the mapping source type {1} is not mapped to any member on the mapping target type {2}",
             DiagnosticCategories.Mapper,
-            DiagnosticSeverity.Info,
+            DiagnosticSeverity.Warning,
             true
         );
 
@@ -235,36 +225,6 @@ public static class DiagnosticDescriptors
             true
         );
 
-    public static readonly DiagnosticDescriptor CannotMapFromIndexedMember =
-        new(
-            "RMG026",
-            "Cannot map from indexed member",
-            "Cannot map from indexed member {0}.{1} to member {2}.{3}",
-            DiagnosticCategories.Mapper,
-            DiagnosticSeverity.Info,
-            true
-        );
-
-    public static readonly DiagnosticDescriptor MultipleConfigurationsForConstructorParameter =
-        new(
-            "RMG027",
-            "A constructor parameter can have one configuration at max",
-            "The constructor parameter at {0}.{1} can have one configuration at max",
-            DiagnosticCategories.Mapper,
-            DiagnosticSeverity.Warning,
-            true
-        );
-
-    public static readonly DiagnosticDescriptor ConstructorParameterDoesNotSupportPaths =
-        new(
-            "RMG028",
-            "Constructor parameter cannot handle target paths",
-            "Cannot map to constructor parameter target path {0}.{1}",
-            DiagnosticCategories.Mapper,
-            DiagnosticSeverity.Error,
-            true
-        );
-
     public static readonly DiagnosticDescriptor QueryableProjectionMappingsDoNotSupportReferenceHandling =
         new(
             "RMG029",
@@ -279,7 +239,7 @@ public static class DiagnosticDescriptors
         new(
             "RMG030",
             "Reference loop detected while mapping to an init only member",
-            "Reference loop detected while mapping from {0}.{1} to the init only member {2}.{3}, consider ignoring this member",
+            "Reference loop detected while mapping from {0} to the init only member {1}, consider ignoring this member",
             DiagnosticCategories.Mapper,
             DiagnosticSeverity.Error,
             true
@@ -289,7 +249,7 @@ public static class DiagnosticDescriptors
         new(
             "RMG031",
             "Reference loop detected while mapping to a constructor parameter",
-            "Reference loop detected while mapping from {0}.{1} to the constructor parameter {3} of {2}, consider ignoring this member or mark another constructor as mapping constructor",
+            "Reference loop detected while mapping from {0} to the constructor parameter {2} of {1}, consider ignoring this member or mark another constructor as mapping constructor",
             DiagnosticCategories.Mapper,
             DiagnosticSeverity.Warning,
             true
@@ -351,7 +311,7 @@ public static class DiagnosticDescriptors
             "An enum member could not be found on the source enum",
             "Enum member {0} ({1}) on {2} not found on source enum {3}",
             DiagnosticCategories.Mapper,
-            DiagnosticSeverity.Info,
+            DiagnosticSeverity.Warning,
             true
         );
 
@@ -361,7 +321,7 @@ public static class DiagnosticDescriptors
             "An enum member could not be found on the target enum",
             "Enum member {0} ({1}) on {2} not found on target enum {3}",
             DiagnosticCategories.Mapper,
-            DiagnosticSeverity.Info,
+            DiagnosticSeverity.Warning,
             true
         );
 
@@ -449,7 +409,7 @@ public static class DiagnosticDescriptors
         new(
             "RMG047",
             "Cannot map to member path due to modifying a temporary value, see CS1612",
-            "Cannot map from member {0}.{1} of type {2} to member path {3}.{4} of type {5} because {6}.{7} is a value type, returning a temporary value, see CS1612",
+            "Cannot map from member {0} to member path {1} because {2}.{3} is a value type, returning a temporary value, see CS1612",
             DiagnosticCategories.Mapper,
             DiagnosticSeverity.Error,
             true
@@ -469,7 +429,7 @@ public static class DiagnosticDescriptors
         new(
             "RMG049",
             "Source member is ignored and also explicitly mapped",
-            "The source member {0} on {1} is ignored, but is also mapped by the " + nameof(MapPropertyAttribute),
+            "The source member {0} on {1} is ignored, but is also mapped explicitly",
             DiagnosticCategories.Mapper,
             DiagnosticSeverity.Warning,
             true
@@ -479,7 +439,7 @@ public static class DiagnosticDescriptors
         new(
             "RMG050",
             "Target member is ignored and also explicitly mapped",
-            "The target member {0} on {1} is ignored, but is also mapped by the " + nameof(MapPropertyAttribute),
+            "The target member {0} on {1} is ignored, but is also mapped explicitly",
             DiagnosticCategories.Mapper,
             DiagnosticSeverity.Warning,
             true
@@ -650,8 +610,8 @@ public static class DiagnosticDescriptors
     public static readonly DiagnosticDescriptor InvalidMapPropertyAttributeUsage =
         new(
             "RMG067",
-            "Invalid usage of the MapPropertyAttribute",
-            "Invalid usage of the MapPropertyAttribute",
+            "Invalid usage of the " + nameof(MapPropertyAttribute),
+            "Invalid usage of the " + nameof(MapPropertyAttribute),
             DiagnosticCategories.Mapper,
             DiagnosticSeverity.Error,
             true
@@ -714,6 +674,76 @@ public static class DiagnosticDescriptors
             "The target type {1} of the referenced mapping {0} does not match the expected type {2}",
             DiagnosticCategories.Mapper,
             DiagnosticSeverity.Warning,
+            true
+        );
+
+    public static readonly DiagnosticDescriptor MultipleConfigurationsForTargetMember =
+        new(
+            "RMG074",
+            "Multiple mappings are configured for the same target member",
+            "Multiple mappings are configured for the same target member {0}.{1}",
+            DiagnosticCategories.Mapper,
+            DiagnosticSeverity.Error,
+            true
+        );
+
+    public static readonly DiagnosticDescriptor InvalidMapValueAttributeUsage =
+        new(
+            "RMG075",
+            "Invalid usage of the " + nameof(MapValueAttribute),
+            "Invalid usage of the " + nameof(MapValueAttribute),
+            DiagnosticCategories.Mapper,
+            DiagnosticSeverity.Error,
+            true
+        );
+
+    public static readonly DiagnosticDescriptor CannotMapValueNullToNonNullable =
+        new(
+            "RMG076",
+            "Cannot assign null to non-nullable member",
+            "Cannot assign null to non-nullable member {0}",
+            DiagnosticCategories.Mapper,
+            DiagnosticSeverity.Warning,
+            true
+        );
+
+    public static readonly DiagnosticDescriptor MapValueTypeMismatch =
+        new(
+            "RMG077",
+            "Cannot assign constant value because the type of the value does not match the type of the target",
+            "Cannot assign constant value {0} of type {1} to {2}",
+            DiagnosticCategories.Mapper,
+            DiagnosticSeverity.Error,
+            true
+        );
+
+    public static readonly DiagnosticDescriptor MapValueMethodTypeMismatch =
+        new(
+            "RMG078",
+            "Cannot assign method return type because the type of the value does not match the type of the target",
+            "Cannot assign method return type {1} of {0}() to {2}",
+            DiagnosticCategories.Mapper,
+            DiagnosticSeverity.Error,
+            true
+        );
+
+    public static readonly DiagnosticDescriptor MapValueReferencedMethodNotFound =
+        new(
+            "RMG079",
+            "The referenced method could not be found or has an unsupported signature",
+            "The referenced method {0} could not be found or has an unsupported signature",
+            DiagnosticCategories.Mapper,
+            DiagnosticSeverity.Error,
+            true
+        );
+
+    public static readonly DiagnosticDescriptor MapValueUnsupportedType =
+        new(
+            "RMG080",
+            $"The {nameof(MapValueAttribute)} does not support types and arrays",
+            $"The {nameof(MapValueAttribute)} does not support types and arrays",
+            DiagnosticCategories.Mapper,
+            DiagnosticSeverity.Error,
             true
         );
 

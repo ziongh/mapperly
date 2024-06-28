@@ -18,17 +18,34 @@ public class MembersContainerBuilderContext<T>(MappingBuilderContext builderCont
 
     public void AddMemberAssignmentMapping(IMemberAssignmentMapping memberMapping) => AddMemberAssignmentMapping(Mapping, memberMapping);
 
+    /// <summary>
+    /// Adds an if-else style block which only executes the <paramref name="memberMapping"/>
+    /// if the source member is not null.
+    /// </summary>
+    /// <param name="memberMapping">The member mapping to be applied if the source member is not null</param>
     public void AddNullDelegateMemberAssignmentMapping(IMemberAssignmentMapping memberMapping)
     {
-        var nullConditionSourcePath = new MemberPath(memberMapping.SourcePath.PathWithoutTrailingNonNullable().ToList());
+        if (memberMapping.MemberInfo.SourceMember == null)
+        {
+            AddMemberAssignmentMapping(memberMapping);
+            return;
+        }
+
+        var nullConditionSourcePath = new NonEmptyMemberPath(
+            memberMapping.MemberInfo.SourceMember.RootType,
+            memberMapping.MemberInfo.SourceMember.PathWithoutTrailingNonNullable().ToList()
+        );
         var container = GetOrCreateNullDelegateMappingForPath(nullConditionSourcePath);
         AddMemberAssignmentMapping(container, memberMapping);
 
         // set target member to null if null assignments are allowed
         // and the source is null
-        if (BuilderContext.Configuration.Mapper.AllowNullPropertyAssignment && memberMapping.TargetPath.Member.Type.IsNullable())
+        if (
+            BuilderContext.Configuration.Mapper.AllowNullPropertyAssignment
+            && memberMapping.MemberInfo.TargetMember.Member.Type.IsNullable()
+        )
         {
-            container.AddNullMemberAssignment(SetterMemberPath.Build(BuilderContext, memberMapping.TargetPath));
+            container.AddNullMemberAssignment(SetterMemberPath.Build(BuilderContext, memberMapping.MemberInfo.TargetMember));
         }
         else if (BuilderContext.Configuration.Mapper.ThrowOnPropertyMappingNullMismatch)
         {
@@ -38,16 +55,16 @@ public class MembersContainerBuilderContext<T>(MappingBuilderContext builderCont
 
     private void AddMemberAssignmentMapping(IMemberAssignmentMappingContainer container, IMemberAssignmentMapping mapping)
     {
-        SetSourceMemberMapped(mapping.SourcePath);
-        AddNullMemberInitializers(container, mapping.TargetPath);
+        AddNullMemberInitializers(container, mapping.MemberInfo.TargetMember);
         container.AddMemberMapping(mapping);
+        MappingAdded(mapping.MemberInfo);
     }
 
     private void AddNullMemberInitializers(IMemberAssignmentMappingContainer container, MemberPath path)
     {
         foreach (var nullableTrailPath in path.ObjectPathNullableSubPaths())
         {
-            var nullablePath = new MemberPath(nullableTrailPath);
+            var nullablePath = new NonEmptyMemberPath(path.RootType, nullableTrailPath);
             var type = nullablePath.Member.Type;
 
             if (!nullablePath.Member.CanSet)
@@ -87,7 +104,12 @@ public class MembersContainerBuilderContext<T>(MappingBuilderContext builderCont
         var needsNullSafeAccess = false;
         foreach (var nullablePath in nullConditionSourcePath.ObjectPathNullableSubPaths().Reverse())
         {
-            if (_nullDelegateMappings.TryGetValue(new MemberPath(nullablePath), out var parentMappingHolder))
+            if (
+                _nullDelegateMappings.TryGetValue(
+                    new NonEmptyMemberPath(nullConditionSourcePath.RootType, nullablePath),
+                    out var parentMappingHolder
+                )
+            )
             {
                 parentMapping = parentMappingHolder;
                 break;

@@ -1,12 +1,10 @@
 using System.Diagnostics.CodeAnalysis;
 using Microsoft.CodeAnalysis;
 using Riok.Mapperly.Abstractions;
-using Riok.Mapperly.Configuration;
 using Riok.Mapperly.Descriptors.MappingBodyBuilders.BuilderContext;
 using Riok.Mapperly.Descriptors.Mappings;
 using Riok.Mapperly.Descriptors.Mappings.MemberMappings;
 using Riok.Mapperly.Diagnostics;
-using Riok.Mapperly.Helpers;
 using Riok.Mapperly.Symbols;
 
 namespace Riok.Mapperly.Descriptors.MappingBodyBuilders;
@@ -16,6 +14,11 @@ namespace Riok.Mapperly.Descriptors.MappingBodyBuilders;
 /// </summary>
 public static class NewInstanceObjectMemberMappingBodyBuilder
 {
+    public record ConstructorMappingBuilderOptions(
+        IReadOnlyDictionary<string, MemberPath>? AdditionalParameterSourceValues = null,
+        bool? PreferParameterlessConstructor = null
+    );
+
     public static void BuildMappingBody(MappingBuilderContext ctx, NewInstanceObjectMemberMapping mapping)
     {
         var mappingCtx = new NewInstanceBuilderContext<NewInstanceObjectMemberMapping>(ctx, mapping);
@@ -30,151 +33,22 @@ public static class NewInstanceObjectMemberMappingBodyBuilder
         BuildConstructorMapping(mappingCtx);
         BuildInitMemberMappings(mappingCtx);
         ObjectMemberMappingBodyBuilder.BuildMappingBody(mappingCtx);
+        mappingCtx.AddDiagnostics();
     }
 
-    private static void BuildInitMemberMappings(INewInstanceBuilderContext<IMapping> ctx, bool includeAllMembers = false)
-    {
-        var initOnlyTargetMembers = includeAllMembers
-            ? ctx.TargetMembers.Values.ToArray()
-            : ctx.TargetMembers.Values.Where(x => x.CanOnlySetViaInitializer()).ToArray();
-        foreach (var targetMember in initOnlyTargetMembers)
-        {
-            ctx.TargetMembers.Remove(targetMember.Name);
-
-            if (ctx.MemberConfigsByRootTargetName.Remove(targetMember.Name, out var memberConfigs))
-            {
-                BuildInitMemberMapping(ctx, targetMember, memberConfigs);
-                continue;
-            }
-
-            if (!ctx.TryFindNestedSourceMembersPath(targetMember.Name, out var sourceMemberPath))
-            {
-                if (targetMember.IsRequired)
-                {
-                    ctx.BuilderContext.ReportDiagnostic(
-                        DiagnosticDescriptors.RequiredMemberNotMapped,
-                        targetMember.Name,
-                        ctx.Mapping.TargetType,
-                        ctx.Mapping.SourceType
-                    );
-                }
-                else if (ctx.BuilderContext.Configuration.Members.RequiredMappingStrategy.HasFlag(RequiredMappingStrategy.Target))
-                {
-                    ctx.BuilderContext.ReportDiagnostic(
-                        DiagnosticDescriptors.SourceMemberNotFound,
-                        targetMember.Name,
-                        ctx.Mapping.TargetType,
-                        ctx.Mapping.SourceType
-                    );
-                }
-
-                continue;
-            }
-
-            BuildInitMemberMapping(ctx, targetMember, sourceMemberPath);
-        }
-    }
-
-    private static void BuildInitMemberMapping(
-        INewInstanceBuilderContext<IMapping> ctx,
-        IMappableMember targetMember,
-        IReadOnlyCollection<MemberMappingConfiguration> memberConfigs
+    /// <summary>
+    /// Tries to build a constructor invocation.
+    /// </summary>
+    /// <returns>A <see cref="HashSet{T}"/> containing all used <see cref="ConstructorMappingBuilderOptions.AdditionalParameterSourceValues"/>.</returns>
+    public static HashSet<string> BuildConstructorMapping(
+        INewInstanceBuilderContext<INewInstanceObjectMemberMapping> ctx,
+        ConstructorMappingBuilderOptions? options = null
     )
-    {
-        // add configured mapping
-        // target paths are not supported (yet), only target properties
-        if (memberConfigs.Count > 1)
-        {
-            ctx.BuilderContext.ReportDiagnostic(
-                DiagnosticDescriptors.MultipleConfigurationsForInitOnlyMember,
-                targetMember.Type,
-                targetMember.Name
-            );
-        }
-
-        var memberConfig = memberConfigs.First();
-        if (memberConfig.Target.Path.Count > 1)
-        {
-            ctx.BuilderContext.ReportDiagnostic(
-                DiagnosticDescriptors.InitOnlyMemberDoesNotSupportPaths,
-                targetMember.Type,
-                memberConfig.Target.FullName
-            );
-            return;
-        }
-
-        if (
-            !ctx.BuilderContext.SymbolAccessor.TryFindMemberPath(ctx.Mapping.SourceType, memberConfig.Source.Path, out var sourceMemberPath)
-        )
-        {
-            if (ctx.BuilderContext.Configuration.Members.RequiredMappingStrategy.HasFlag(RequiredMappingStrategy.Target))
-            {
-                ctx.BuilderContext.ReportDiagnostic(
-                    DiagnosticDescriptors.SourceMemberNotFound,
-                    targetMember.Name,
-                    ctx.Mapping.TargetType,
-                    ctx.Mapping.SourceType
-                );
-            }
-
-            return;
-        }
-
-        BuildInitMemberMapping(ctx, targetMember, sourceMemberPath, memberConfig);
-    }
-
-    private static void BuildInitMemberMapping(
-        INewInstanceBuilderContext<IMapping> ctx,
-        IMappableMember targetMember,
-        MemberPath sourcePath,
-        MemberMappingConfiguration? memberConfig = null
-    )
-    {
-        var targetPath = new MemberPath(new[] { targetMember });
-        if (!ObjectMemberMappingBodyBuilder.ValidateMappingSpecification(ctx, sourcePath, targetPath, true))
-            return;
-
-        var mappingKey = new TypeMappingKey(sourcePath.MemberType, targetMember.Type, memberConfig?.ToTypeMappingConfiguration());
-        var delegateMapping = ctx.BuilderContext.FindOrBuildLooseNullableMapping(mappingKey, diagnosticLocation: memberConfig?.Location);
-
-        if (delegateMapping == null)
-        {
-            ctx.BuilderContext.ReportDiagnostic(
-                DiagnosticDescriptors.CouldNotMapMember,
-                ctx.Mapping.SourceType,
-                sourcePath.FullName,
-                sourcePath.Member.Type,
-                ctx.Mapping.TargetType,
-                targetPath.FullName,
-                targetPath.Member.Type
-            );
-            return;
-        }
-
-        if (delegateMapping.Equals(ctx.Mapping))
-        {
-            ctx.BuilderContext.ReportDiagnostic(
-                DiagnosticDescriptors.ReferenceLoopInInitOnlyMapping,
-                ctx.Mapping.SourceType,
-                sourcePath.FullName,
-                ctx.Mapping.TargetType,
-                targetPath.FullName
-            );
-            return;
-        }
-
-        var setterTargetPath = SetterMemberPath.Build(ctx.BuilderContext, targetPath);
-        var memberMapping = ctx.BuildNullMemberMapping(sourcePath, delegateMapping, targetMember.Type);
-        var memberAssignmentMapping = new MemberAssignmentMapping(setterTargetPath, memberMapping);
-        ctx.AddInitMemberMapping(memberAssignmentMapping);
-    }
-
-    private static void BuildConstructorMapping(INewInstanceBuilderContext<IMapping> ctx)
     {
         if (ctx.Mapping.TargetType is not INamedTypeSymbol namedTargetType)
         {
             ctx.BuilderContext.ReportDiagnostic(DiagnosticDescriptors.NoConstructorFound, ctx.BuilderContext.Target);
-            return;
+            return [];
         }
 
         // attributed ctor is prio 1
@@ -186,7 +60,7 @@ public static class NewInstanceObjectMemberMappingBodyBuilder
             .OrderByDescending(x => ctx.BuilderContext.SymbolAccessor.HasAttribute<MapperConstructorAttribute>(x))
             .ThenBy(x => ctx.BuilderContext.SymbolAccessor.HasAttribute<ObsoleteAttribute>(x));
 
-        if (ctx.BuilderContext.Configuration.Mapper.PreferParameterlessConstructors)
+        if (options?.PreferParameterlessConstructor ?? ctx.BuilderContext.Configuration.Mapper.PreferParameterlessConstructors)
         {
             ctorCandidates = ctorCandidates.ThenByDescending(x => x.Parameters.Length == 0).ThenByDescending(x => x.Parameters.Length);
         }
@@ -197,7 +71,15 @@ public static class NewInstanceObjectMemberMappingBodyBuilder
 
         foreach (var ctorCandidate in ctorCandidates)
         {
-            if (!TryBuildConstructorMapping(ctx, ctorCandidate, out var mappedTargetMemberNames, out var constructorParameterMappings))
+            if (
+                !TryBuildConstructorMapping(
+                    ctx,
+                    ctorCandidate,
+                    options,
+                    out var usedAdditionalParameterSourceValues,
+                    out var constructorParameterMappings
+                )
+            )
             {
                 if (ctx.BuilderContext.SymbolAccessor.HasAttribute<MapperConstructorAttribute>(ctorCandidate))
                 {
@@ -211,31 +93,89 @@ public static class NewInstanceObjectMemberMappingBodyBuilder
                 continue;
             }
 
-            ctx.TargetMembers.RemoveRange(mappedTargetMemberNames);
-            foreach (var constructorParameterMapping in constructorParameterMappings)
+            foreach (var mapping in constructorParameterMappings)
             {
-                ctx.AddConstructorParameterMapping(constructorParameterMapping);
+                ctx.AddConstructorParameterMapping(mapping);
             }
 
-            return;
+            return usedAdditionalParameterSourceValues;
         }
 
         ctx.BuilderContext.ReportDiagnostic(DiagnosticDescriptors.NoConstructorFound, ctx.BuilderContext.Target);
+        return [];
+    }
+
+    public static void BuildInitMemberMappings(
+        INewInstanceBuilderContext<INewInstanceObjectMemberMapping> ctx,
+        bool includeAllMembers = false
+    )
+    {
+        var initOnlyTargetMembers = includeAllMembers
+            ? ctx.EnumerateUnmappedTargetMembers().ToArray()
+            : ctx.EnumerateUnmappedTargetMembers().Where(x => x.CanOnlySetViaInitializer()).ToArray();
+        foreach (var targetMember in initOnlyTargetMembers)
+        {
+            if (ctx.TryMatchInitOnlyMember(targetMember, out var memberInfo))
+            {
+                BuildInitMemberMapping(ctx, memberInfo);
+                continue;
+            }
+
+            // set the member mapped as it is an init only member
+            // diagnostics are already reported
+            // and no further mapping attempts should be undertaken
+            ctx.BuilderContext.ReportDiagnostic(
+                targetMember.IsRequired ? DiagnosticDescriptors.RequiredMemberNotMapped : DiagnosticDescriptors.SourceMemberNotFound,
+                targetMember.Name,
+                ctx.Mapping.TargetType,
+                ctx.Mapping.SourceType
+            );
+            ctx.SetTargetMemberMapped(targetMember);
+        }
+    }
+
+    private static void BuildInitMemberMapping(
+        INewInstanceBuilderContext<INewInstanceObjectMemberMapping> ctx,
+        MemberMappingInfo memberInfo
+    )
+    {
+        // consume member configs
+        // to ensure no further mappings are created for these configurations,
+        // even if a mapping validation fails
+        ctx.ConsumeMemberConfigs(memberInfo);
+
+        if (!ObjectMemberMappingBodyBuilder.ValidateMappingSpecification(ctx, memberInfo, true))
+            return;
+
+        if (!MemberMappingBuilder.TryBuildAssignment(ctx, memberInfo, out var memberAssignmentMapping))
+            return;
+
+        ctx.AddInitMemberMapping(memberAssignmentMapping);
     }
 
     private static bool TryBuildConstructorMapping(
         INewInstanceBuilderContext<IMapping> ctx,
         IMethodSymbol ctor,
-        [NotNullWhen(true)] out ISet<string>? mappedTargetMemberNames,
-        [NotNullWhen(true)] out ISet<ConstructorParameterMapping>? constructorParameterMappings
+        ConstructorMappingBuilderOptions? options,
+        [NotNullWhen(true)] out HashSet<string>? usedAdditionalParameterSourceValues,
+        [NotNullWhen(true)] out List<ConstructorParameterMapping>? constructorParameterMappings
     )
     {
-        constructorParameterMappings = new HashSet<ConstructorParameterMapping>();
-        mappedTargetMemberNames = new HashSet<string>();
+        constructorParameterMappings = new List<ConstructorParameterMapping>();
+        usedAdditionalParameterSourceValues = new HashSet<string>();
+
         var skippedOptionalParam = false;
         foreach (var parameter in ctor.Parameters)
         {
-            if (!TryFindConstructorParameterSourcePath(ctx, parameter, out var sourcePath, out var memberConfig))
+            if (
+                !TryMatchParameter(
+                    ctx,
+                    options?.AdditionalParameterSourceValues,
+                    usedAdditionalParameterSourceValues,
+                    parameter,
+                    out var memberMappingInfo
+                ) || !SourceValueBuilder.TryBuildMappedSourceValue(ctx, memberMappingInfo, out var sourceValue)
+            )
             {
                 // expressions do not allow skipping of optional parameters
                 if (!parameter.IsOptional || ctx.BuilderContext.IsExpression)
@@ -245,93 +185,37 @@ public static class NewInstanceObjectMemberMappingBodyBuilder
                 continue;
             }
 
-            // nullability is handled inside the member mapping
-            var parameterType = ctx.BuilderContext.SymbolAccessor.UpgradeNullable(parameter.Type);
-            var typeMapping = new TypeMappingKey(sourcePath.MemberType, parameterType, memberConfig?.ToTypeMappingConfiguration());
-            var delegateMapping = ctx.BuilderContext.FindOrBuildLooseNullableMapping(
-                typeMapping,
-                diagnosticLocation: memberConfig?.Location
-            );
-
-            if (delegateMapping == null)
-            {
-                if (!parameter.IsOptional)
-                    return false;
-
-                skippedOptionalParam = true;
-                continue;
-            }
-
-            if (delegateMapping.Equals(ctx.Mapping))
-            {
-                ctx.BuilderContext.ReportDiagnostic(
-                    DiagnosticDescriptors.ReferenceLoopInCtorMapping,
-                    ctx.Mapping.SourceType,
-                    sourcePath.FullName,
-                    ctx.Mapping.TargetType,
-                    parameter.Name
-                );
-                return false;
-            }
-
-            var memberMapping = ctx.BuildNullMemberMapping(sourcePath, delegateMapping, parameterType);
-            var ctorMapping = new ConstructorParameterMapping(parameter, memberMapping, skippedOptionalParam);
+            var ctorMapping = new ConstructorParameterMapping(parameter, sourceValue, skippedOptionalParam, memberMappingInfo);
             constructorParameterMappings.Add(ctorMapping);
-            mappedTargetMemberNames.Add(parameter.Name);
         }
 
         return true;
     }
 
-    private static bool TryFindConstructorParameterSourcePath(
+    private static bool TryMatchParameter(
         INewInstanceBuilderContext<IMapping> ctx,
+        IReadOnlyDictionary<string, MemberPath>? additionalParameterMappings,
+        HashSet<string> usedAdditionalParameterSourceValues,
         IParameterSymbol parameter,
-        [NotNullWhen(true)] out MemberPath? sourcePath,
-        out MemberMappingConfiguration? memberConfig
+        [NotNullWhen(true)] out MemberMappingInfo? memberInfo
     )
     {
-        sourcePath = null;
-        memberConfig = null;
+        if (ctx.TryMatchParameter(parameter, out memberInfo))
+            return true;
 
-        if (
-            !ctx.RootTargetNameCasingMapping.TryGetValue(parameter.Name, out var parameterName)
-            || !ctx.MemberConfigsByRootTargetName.TryGetValue(parameterName, out var memberConfigs)
-        )
+        if (additionalParameterMappings?.TryGetValue(parameter.Name, out var sourcePath) == true)
         {
-            return ctx.TryFindNestedSourceMembersPath(parameter.Name, out sourcePath, true);
-        }
-
-        if (memberConfigs.Count > 1)
-        {
-            ctx.BuilderContext.ReportDiagnostic(
-                DiagnosticDescriptors.MultipleConfigurationsForConstructorParameter,
-                parameter.Type,
-                parameter.Name
+            memberInfo = new MemberMappingInfo(
+                sourcePath,
+                new NonEmptyMemberPath(
+                    ctx.Mapping.TargetType,
+                    [new ConstructorParameterMember(parameter, ctx.BuilderContext.SymbolAccessor)]
+                )
             );
+            usedAdditionalParameterSourceValues.Add(parameter.Name);
+            return true;
         }
 
-        memberConfig = memberConfigs.First();
-        if (memberConfig.Target.Path.Count > 1)
-        {
-            ctx.BuilderContext.ReportDiagnostic(
-                DiagnosticDescriptors.ConstructorParameterDoesNotSupportPaths,
-                parameter.Type,
-                memberConfig.Target.FullName
-            );
-            return false;
-        }
-
-        if (!ctx.BuilderContext.SymbolAccessor.TryFindMemberPath(ctx.Mapping.SourceType, memberConfig.Source.Path, out sourcePath))
-        {
-            ctx.BuilderContext.ReportDiagnostic(
-                DiagnosticDescriptors.SourceMemberNotFound,
-                memberConfig.Source.FullName,
-                ctx.Mapping.TargetType,
-                ctx.Mapping.SourceType
-            );
-            return false;
-        }
-
-        return true;
+        return false;
     }
 }
