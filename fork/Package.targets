@@ -1,0 +1,16 @@
+<Project>
+  <!-- Packaging-only overlay: leave upstream assembly names and project files unchanged. -->
+  <PropertyGroup Condition="'$(MSBuildProjectName)' == 'Riok.Mapperly'">
+    <PackageId>GreatUtilities.MapperWithPrimitiveOnly</PackageId>
+    <PackageProjectUrl>https://github.com/ziongh/mapperly/tree/primitive-only-maintained</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/ziongh/mapperly</RepositoryUrl>
+    <PackageDescription>Mapperly fork with opt-in scalar-only member mapping, including strongly typed unmanaged value-object keys. Based on upstream Mapperly; not an official Riok release.</PackageDescription>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+  </PropertyGroup>
+  <ItemGroup Condition="'$(MSBuildProjectName)' == 'Riok.Mapperly'">
+    <None Update="../../README.md" Pack="false" />
+    <None Include="$(MSBuildThisFileDirectory)README.md" Pack="true" PackagePath="/" />
+    <!-- NuGet auto-import requires this filename to match the fork's package ID. -->
+    <None Update="Riok.Mapperly.targets" PackagePath="build/GreatUtilities.MapperWithPrimitiveOnly.targets" />
+  </ItemGroup>
+</Project>

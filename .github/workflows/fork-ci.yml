@@ -1,0 +1,60 @@
+name: Primitive-only fork
+
+on:
+  push:
+    branches: [primitive-only-maintained]
+  pull_request:
+    branches: [primitive-only-maintained]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: fork-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: 10.0.x
+      - run: git remote add upstream https://github.com/riok/mapperly.git && git fetch upstream main --tags
+      - run: dotnet tool restore
+      - run: dotnet build /p:TreatWarningsAsErrors=true
+      - run: dotnet test --no-build
+      - run: bash -n fork/package.sh fork/publish.sh && python3 -m unittest discover -s fork -p 'test_*.py'
+      - run: RELEASE_VERSION="0.0.0-ci.${{ github.run_id }}" bash fork/package.sh
+      - run: dotnet meziantou.validate-nuget-package artifacts/fork/*/*.nupkg
+      - uses: actions/upload-artifact@v7
+        with:
+          name: primitive-only-package
+          path: artifacts/fork/*/*.nupkg
+
+  package-consumer:
+    needs: validate
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { framework: net8.0, sdk: 8.0.100 }
+          - { framework: net8.0, sdk: 8.0.414 }
+          - { framework: net9.0, sdk: 9.0.305 }
+          - { framework: net10.0, sdk: 10.0.400 }
+          - { framework: net11.0, sdk: 11.0.100-rc.2.26504.105 }
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: ${{ matrix.sdk }}
+      - uses: actions/download-artifact@v8
+        with:
+          name: primitive-only-package
+          path: fork-package
+      - run: python3 fork/smoke-package.py fork-package/*.nupkg '${{ matrix.framework }}' '${{ matrix.sdk }}'
