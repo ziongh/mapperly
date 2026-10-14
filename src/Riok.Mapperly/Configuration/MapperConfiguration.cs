@@ -67,6 +67,9 @@ public record MapperConfiguration
     /// </summary>
     public bool? UseDeepCloning { get; init; }
 
+    /// <inheritdoc cref="MapperAttribute.MapOnlyPrimitives"/>
+    public bool? MapOnlyPrimitives { get; init; }
+
     /// <summary>
     /// The strategy to use when cloning a <see cref="System.Collections.Generic.Stack{T}"/>.
     /// </summary>

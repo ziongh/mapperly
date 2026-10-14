@@ -1,6 +1,7 @@
 using Riok.Mapperly.Abstractions;
 using Riok.Mapperly.Configuration;
 using Riok.Mapperly.Diagnostics;
+using Riok.Mapperly.Helpers;
 using Riok.Mapperly.Symbols;
 
 namespace Riok.Mapperly.Descriptors.MappingBodyBuilders.BuilderContext;
@@ -30,6 +31,22 @@ internal static class IgnoredMembersBuilder
 
         RemoveAndReportConfiguredIgnoredMembers(ctx, sourceTarget, ignoredMembers);
         ReportUnmatchedIgnoredMembers(ctx, sourceTarget, ignoredMembers, allMembers);
+
+        if (ctx.Configuration.Mapper.MapOnlyPrimitives)
+        {
+            var type = sourceTarget == MappingSourceTarget.Source ? ctx.Source : ctx.Target;
+            var configured = ctx.Configuration.Members.GetMembersWithExplicitConfigurations(sourceTarget).ToHashSet();
+            ignoredMembers.UnionWith(
+                ctx.SymbolAccessor.GetAllAccessibleMappableMembers(type)
+                    .Where(member =>
+                        !configured.Contains(member.Name)
+                        && !PrimitiveMemberType.IsSupported(member.Type)
+                        && (sourceTarget == MappingSourceTarget.Source || !member.IsRequired)
+                    )
+                    .Select(member => member.Name)
+            );
+        }
+
         return ignoredMembers;
     }
 

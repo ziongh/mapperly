@@ -70,6 +70,14 @@ public class MapperAttribute : Attribute
     public bool UseDeepCloning { get; set; }
 
     /// <summary>
+    /// Automatically maps only scalar members and collections of scalar values, skipping object relationships.
+    /// Explicit member configurations take precedence. This does not limit collection sizes or reset entity keys.
+    /// Use <see cref="UseDeepCloning"/> to copy included collections instead of sharing them.
+    /// Defaults to <c>false</c>.
+    /// </summary>
+    public bool MapOnlyPrimitives { get; set; }
+
+    /// <summary>
     /// The strategy to use when cloning a <see cref="System.Collections.Generic.Stack{T}"/>.
     /// </summary>
     public StackCloningStrategy StackCloningStrategy { get; set; } = StackCloningStrategy.PreserveOrder;
