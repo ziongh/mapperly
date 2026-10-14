@@ -57,4 +57,4 @@ jobs:
         with:
           name: primitive-only-package
           path: fork-package
-      - run: python3 fork/smoke-package.py fork-package/*.nupkg '${{ matrix.framework }}' '${{ matrix.sdk }}'
+      - run: python3 fork/smoke-package.py fork-package/*/*.nupkg '${{ matrix.framework }}' '${{ matrix.sdk }}'
